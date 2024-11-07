@@ -1,9 +1,9 @@
 <?php
 namespace Klxm\Nextcloud;
 
-// REDAXO Klassen mit führendem Backslash
+// Prüfe Konfiguration
 if (!\rex_config::get('nextcloud', 'baseurl') || !\rex_config::get('nextcloud', 'username') || !\rex_config::get('nextcloud', 'password')) {
-    echo \rex_view::warning(\rex_i18n::msg('nextcloud_config_missing'));
+    echo \rex_view::warning(rex_i18n::msg('nextcloud_config_missing'));
     return;
 }
 
@@ -35,14 +35,14 @@ $content = '
         <header class="panel-heading">
             <div class="panel-title">
                 <i class="rex-icon fa-cloud"></i> NextCloud
-                <span class="pull-right">
+                <div class="pull-right btn-group">
                     <button class="btn btn-default btn-xs" id="btnRefresh">
                         <i class="rex-icon fa-refresh"></i> ' . \rex_i18n::msg('nextcloud_refresh') . '
                     </button>
                     <button class="btn btn-default btn-xs" id="btnHome">
                         <i class="rex-icon fa-home"></i>
                     </button>
-                </span>
+                </div>
             </div>
         </header>
         <div class="panel-body">
@@ -50,18 +50,34 @@ $content = '
             <table class="table table-hover">
                 <thead>
                     <tr>
-                        <th style="width: 40px"></th>
+                        <th style="width: 30px">
+                            <label class="sr-only">Auswählen</label>
+                        </th>
+                        <th style="width: 40px">
+                            <label class="sr-only">Typ</label>
+                        </th>
                         <th>' . \rex_i18n::msg('nextcloud_filename') . '</th>
                         <th style="width: 150px">' . \rex_i18n::msg('nextcloud_filesize') . '</th>
                         <th style="width: 150px">' . \rex_i18n::msg('nextcloud_modified') . '</th>
-                        <th style="width: 100px"></th>
+                        <th style="width: 100px">
+                            <label class="sr-only">Aktionen</label>
+                        </th>
                     </tr>
                 </thead>
                 <tbody id="fileList"></tbody>
             </table>
         </div>
     </div>
-</div>';
+</div>
+
+<style>
+.nextcloud-container .progress {
+    margin: 20px 0;
+}
+.file-select {
+    cursor: pointer;
+}
+</style>';
 
 // Fragment erstellen und ausgeben
 $fragment = new \rex_fragment();

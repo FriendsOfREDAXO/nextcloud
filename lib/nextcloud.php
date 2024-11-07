@@ -1,19 +1,11 @@
 <?php
 namespace Klxm\Nextcloud;
 
-/**
- * Class NextCloud
- * @package Klxm\Nextcloud
- */
 class NextCloud {
-    private string $baseUrl;
-    private string $username;
-    private string $password;
+    private $baseUrl;
+    private $username;
+    private $password;
 
-    /**
-     * NextCloud constructor.
-     * @throws \rex_exception
-     */
     public function __construct() {
         $this->baseUrl = \rex_config::get('nextcloud', 'baseurl');
         $this->username = \rex_config::get('nextcloud', 'username');
@@ -26,41 +18,103 @@ class NextCloud {
         $this->baseUrl = rtrim($this->baseUrl, '/');
     }
 
-    /**
-     * Get image content from NextCloud
-     * 
-     * @param string $path
-     * @return string
-     * @throws \rex_exception
-     */
-    public function getImageContent(string $path): string {
-        try {
-            $webdavPath = '/remote.php/dav/files/' . urlencode($this->username) . $path;
-            return $this->request($webdavPath, 'GET');
-        } catch (\Exception $e) {
-            throw new \rex_exception("Failed to get image: " . $e->getMessage());
-        }
+    private function encodeUrl($path) {
+        // Entferne alle doppelten Slashes
+        $path = preg_replace('#/+#', '/', $path);
+        
+        // Splitte den Pfad in Segmente
+        $segments = explode('/', $path);
+        
+        // Kodiere jedes Segment einzeln
+        $encodedSegments = array_map(function($segment) {
+            // Behandle leere Segmente
+            if ($segment === '') {
+                return '';
+            }
+            
+            // Wandle Umlaute in UTF-8 um
+            $segment = mb_convert_encoding($segment, 'UTF-8', 'auto');
+            
+            // Kodiere alle Sonderzeichen außer -_.
+            return rawurlencode($segment);
+        }, $segments);
+        
+        // Verbinde die Segmente wieder und stelle sicher, dass führende/nachfolgende Slashes erhalten bleiben
+        $encodedPath = implode('/', array_filter($encodedSegments, function($segment) {
+            return $segment !== '';
+        }));
+        
+        // Stelle sicher, dass der Pfad mit einem Slash beginnt
+        $encodedPath = '/' . ltrim($encodedPath, '/');
+        
+        return $encodedPath;
     }
 
-    /**
-     * Make a request to NextCloud
-     * 
-     * @param string $path
-     * @param string $method
-     * @param string|null $data
-     * @return string
-     * @throws \rex_exception
-     */
-    private function request(string $path, string $method = 'GET', ?string $data = null): string {
+    private function decodeUrl($path) {
+        // Dekodiere jeden Teil des Pfads einzeln
+        $segments = explode('/', $path);
+        
+        $decodedSegments = array_map(function($segment) {
+            // Dekodiere URL-kodierte Zeichen
+            $segment = rawurldecode($segment);
+            
+            // Stelle sicher, dass die UTF-8 Kodierung korrekt ist
+            if (mb_check_encoding($segment, 'UTF-8')) {
+                return $segment;
+            }
+            
+            // Versuche die Kodierung zu reparieren
+            return mb_convert_encoding($segment, 'UTF-8', 'auto');
+        }, $segments);
+        
+        return implode('/', $decodedSegments);
+    }
+
+    private function normalizePath($path) {
+        // Dekodiere zuerst den Pfad
+        $path = $this->decodeUrl($path);
+        
+        // Entferne mehrfache Slashes
+        $path = preg_replace('#/+#', '/', $path);
+        
+        // Stelle sicher, dass der Pfad mit einem Slash beginnt
+        $path = '/' . trim($path, '/');
+        
+        // Spezialfall: Wenn der Pfad nur aus Slashes besteht
+        if ($path === '//') {
+            return '/';
+        }
+        
+        // Kodiere den normalisierten Pfad
+        return $this->encodeUrl($path);
+    }
+
+    private function buildWebDavUrl($path) {
+        // Normalisiere und kodiere den Pfad
+        $normalizedPath = $this->normalizePath($path);
+        
+        // Baue die WebDAV-URL
+        $webdavPath = '/remote.php/dav/files/' . rawurlencode($this->username) . $normalizedPath;
+        
+        \rex_logger::factory()->log('debug', 'NextCloud WebDAV URL', [
+            'original_path' => $path,
+            'normalized_path' => $normalizedPath,
+            'webdav_path' => $webdavPath
+        ]);
+        
+        return $webdavPath;
+    }
+
+    private function request($path, $method = 'GET', $data = null) {
         $url = $this->baseUrl . $path;
-
-        // \rex_logger::factory()->log('debug', 'NextCloud Request', [
-        //     'url' => $url,
-        //     'method' => $method
-        // ]);
-
+        
+        \rex_logger::factory()->log('debug', 'NextCloud Request', [
+            'url' => $url,
+            'method' => $method
+        ]);
+        
         $ch = curl_init();
-
+        
         $headers = [];
 
         if ($method === 'PROPFIND') {
@@ -85,7 +139,17 @@ class NextCloud {
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_CUSTOMREQUEST => $method,
             CURLOPT_HEADER => false,
-            CURLOPT_FOLLOWLOCATION => true
+            CURLOPT_FOLLOWLOCATION => true,
+            // Timeouts
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 30,
+            // Retry settings
+            CURLOPT_FRESH_CONNECT => true,
+            CURLOPT_FORBID_REUSE => true,
+            // Keep-Alive
+            CURLOPT_TCP_KEEPALIVE => 1,
+            CURLOPT_TCP_KEEPIDLE => 120,
+            CURLOPT_TCP_KEEPINTVL => 60,
         ];
 
         if ($data) {
@@ -96,191 +160,184 @@ class NextCloud {
 
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-
+        
         if (curl_errno($ch)) {
             $error = curl_error($ch);
-            // \rex_logger::factory()->log('error', 'NextCloud cURL Error', [
-            //     'error' => $error,
-            //     'code' => curl_errno($ch),
-            //     'url' => $url
-            // ]);
+            \rex_logger::factory()->log('error', 'NextCloud cURL Error', [
+                'error' => $error,
+                'code' => curl_errno($ch),
+                'url' => $url,
+                'info' => curl_getinfo($ch)
+            ]);
             curl_close($ch);
             throw new \rex_exception("cURL Error: " . $error);
         }
-
+        
         curl_close($ch);
 
         if ($httpCode >= 200 && $httpCode < 400) {
             return $response;
         }
-
+        
         throw new \rex_exception("API request failed with status code: " . $httpCode);
     }
-
-    /**
-     * Normalize a file path
-     * 
-     * @param string $path
-     * @return string
-     */
-    private function normalizePath(string $path): string {
-        $path = '/' . trim($path, '/');
-        $path = str_replace('//', '/', $path);
-        return $path === '//' ? '/' : $path;
-    }
-
-    /**
-     * List files in a directory
-     * 
-     * @param string $path
-     * @return array
-     * @throws \rex_exception
-     */
-    public function listFiles(string $path = '/'): array {
+	public function listFiles($path = '/') {
         try {
-            $path = $this->normalizePath($path);
-            $url = '/remote.php/dav/files/' . urlencode($this->username) . $path;
-
-            // \rex_logger::factory()->log('debug', 'NextCloud ListFiles', [
-            //     'path' => $path,
-            //     'url' => $url
-            // ]);
-
+            \rex_logger::factory()->log('debug', 'NextCloud ListFiles Start', [
+                'original_path' => $path
+            ]);
+            
+            // URL für die PROPFIND-Anfrage erstellen
+            $url = $this->buildWebDavUrl($path);
+            
+            \rex_logger::factory()->log('debug', 'NextCloud ListFiles URL', [
+                'webdav_url' => $url
+            ]);
+            
             $response = $this->request($url, 'PROPFIND');
-
-            // Remove invalid characters from XML
+            
+            // Entferne ungültige XML-Zeichen
             $response = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $response);
-
-            // Set libxml options
+            
+            // Debug-Log für XML-Antwort
+            \rex_logger::factory()->log('debug', 'NextCloud ListFiles Response', [
+                'response_length' => strlen($response),
+                'response_preview' => substr($response, 0, 500)
+            ]);
+            
+            // XML parsen
             $previousLibXmlUseErrors = libxml_use_internal_errors(true);
-
+            
             try {
                 $xml = new \SimpleXMLElement($response);
             } catch (\Exception $e) {
-                // \rex_logger::factory()->log('error', 'XML Parse Error', [
-                //     'error' => $e->getMessage(),
-                //     'response' => substr($response, 0, 1000)
-                // ]);
+                \rex_logger::factory()->log('error', 'XML Parse Error', [
+                    'error' => $e->getMessage(),
+                    'response' => substr($response, 0, 1000)
+                ]);
                 throw new \rex_exception('Failed to parse server response');
             } finally {
                 libxml_use_internal_errors($previousLibXmlUseErrors);
             }
-
+            
             $xml->registerXPathNamespace('d', 'DAV:');
-
+            
+            // Sammle alle Dateien und Ordner
             $files = [];
             foreach ($xml->xpath('//d:response') as $response) {
+                // Hole den href (Pfad)
                 $href = (string)$response->xpath('d:href')[0];
-                $displayname = basename($href);
+                
+                \rex_logger::factory()->log('debug', 'NextCloud ListFiles Entry', [
+                    'href' => $href
+                ]);
 
-                // Skip current directory
-                if ($displayname === '' || urldecode($href) === $url) {
+                // Extraktion des Pfads
+                $pattern = '#^/remote\.php/dav/files/' . preg_quote($this->username, '#') . '#';
+                $relativePath = preg_replace($pattern, '', rawurldecode($href));
+                $relativePath = $this->normalizePath($relativePath);
+                
+                // Name aus dem Pfad extrahieren
+                $displayname = basename($relativePath);
+                
+                // Überspringe den aktuellen Ordner
+                if ($displayname === '' || $this->normalizePath($relativePath) === $this->normalizePath($path)) {
                     continue;
                 }
-
+                
+                // Eigenschaften auslesen
                 $props = $response->xpath('d:propstat/d:prop')[0];
                 $isDirectory = !empty($props->xpath('d:resourcetype/d:collection'));
-
+                
                 $size = '';
                 if (!$isDirectory && !empty($props->xpath('d:getcontentlength'))) {
                     $size = $this->formatSize((int)$props->xpath('d:getcontentlength')[0]);
                 }
-
+                
                 $lastMod = '';
                 if (!empty($props->xpath('d:getlastmodified'))) {
                     $lastMod = date('Y-m-d H:i', strtotime((string)$props->xpath('d:getlastmodified')[0]));
                 }
 
-                $relativePath = str_replace('/remote.php/dav/files/' . $this->username, '', urldecode($href));
-                $relativePath = $this->normalizePath($relativePath);
-
-                $fileType = $isDirectory ? 'folder' : $this->getFileType($displayname);
-                $fileData = [
-                    'name' => urldecode($displayname),
+                \rex_logger::factory()->log('debug', 'NextCloud ListFiles Processed Entry', [
+                    'name' => $displayname,
                     'path' => $relativePath,
-                    'type' => $fileType,
+                    'is_directory' => $isDirectory,
+                    'size' => $size,
+                    'modified' => $lastMod
+                ]);
+                
+                $files[] = [
+                    'name' => $displayname,
+                    'path' => $relativePath,
+                    'type' => $isDirectory ? 'folder' : $this->getFileType($displayname),
                     'size' => $size,
                     'modified' => $lastMod
                 ];
-
-                // Add preview for images
-                if (!$isDirectory && $fileType === 'image') {
-                    try {
-                        $previewUrl = $this->getImagePreview($relativePath);
-                        if ($previewUrl) {
-                            $fileData['preview'] = $previewUrl;
-                        }
-                    } catch (\Exception $e) {
-                        // \rex_logger::factory()->log('warning', 'Failed to get preview', [
-                        //     'error' => $e->getMessage(),
-                        //     'file' => $relativePath
-                        // ]);
-                    }
-                }
-
-                $files[] = $fileData;
             }
-
+            
+            \rex_logger::factory()->log('debug', 'NextCloud ListFiles Complete', [
+                'total_files' => count($files)
+            ]);
+            
             return $files;
-
+            
         } catch (\Exception $e) {
-            // \rex_logger::factory()->log('error', 'NextCloud ListFiles Error', [
-            //     'error' => $e->getMessage(),
-            //     'trace' => $e->getTraceAsString()
-            // ]);
+            \rex_logger::factory()->log('error', 'NextCloud ListFiles Error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'path' => $path
+            ]);
             throw $e;
         }
     }
 
-    /**
-     * Get image preview URL
-     * 
-     * @param string $path
-     * @return string
-     */
-    private function getImagePreview(string $path): string {
+    public function getImageContent($path) {
         try {
-            // Use NextCloud Preview API
-            $previewPath = '/remote.php/dav/files/' . urlencode($this->username) . $path;
-            $previewUrl = $this->baseUrl . $previewPath;
-
-            // Return direct URL to preview
-            return $previewUrl;
-
+            $webdavPath = $this->buildWebDavUrl($path);
+            return $this->request($webdavPath, 'GET');
         } catch (\Exception $e) {
-            // \rex_logger::factory()->log('error', 'Preview generation failed', [
-            //     'error' => $e->getMessage(),
-            //     'file' => $path
-            // ]);
-            return '';
+            throw new \rex_exception("Failed to get image: " . $e->getMessage());
         }
     }
 
-    /**
-     * Import file to media pool
-     * 
-     * @param string $path
-     * @param int $categoryId
-     * @return array
-     * @throws \rex_exception
-     */
-    public function importToMediapool(string $path, int $categoryId = 0): array {
+    public function importToMediapool($path, $categoryId = 0) {
         try {
-            $path = $this->normalizePath($path);
-            $url = '/remote.php/dav/files/' . urlencode($this->username) . $path;
-
+            \rex_logger::factory()->log('debug', 'NextCloud Import', [
+                'original_path' => $path
+            ]);
+            
+            // Normalisiere den Pfad
+            $url = $this->buildWebDavUrl($path);
+            
+            \rex_logger::factory()->log('debug', 'NextCloud Import URL', [
+                'webdav_url' => $url
+            ]);
+            
+            // Hole den Dateiinhalt
             $content = $this->request($url, 'GET');
-
-            $filename = basename($path);
-            $tmpfile = \rex_path::cache('nextcloud_' . $filename);
-
+            
+            // Dekodiere den Dateinamen für die temporäre Datei
+            $filename = $this->decodeUrl(basename($path));
+            
+            // Erstelle einen sicheren Dateinamen für die temporäre Datei
+            $tmpName = \rex_string::normalize($filename);
+            $tmpfile = \rex_path::cache('nextcloud_' . $tmpName);
+            
+            \rex_logger::factory()->log('debug', 'NextCloud Import File', [
+                'original_filename' => $filename,
+                'temp_filename' => $tmpName,
+                'temp_path' => $tmpfile
+            ]);
+            
             if (file_put_contents($tmpfile, $content) === false) {
                 throw new \rex_exception('Could not save temporary file');
             }
 
+            // Bereite die Daten für den Medienpool vor
             $data = [];
             $data['file'] = [
-                'name' => $filename,
+                'name' => $filename, // Original-Dateiname
                 'path' => $tmpfile,
                 'tmp_name' => $tmpfile
             ];
@@ -288,30 +345,29 @@ class NextCloud {
             $data['title'] = pathinfo($filename, PATHINFO_FILENAME);
 
             $result = \rex_media_service::addMedia($data, true);
-
+            
             @unlink($tmpfile);
-
+            
             return $result;
-
+            
         } catch (\Exception $e) {
-            throw new \rex_exception("Failed to import file: " . $e->getMessage());
+            \rex_logger::factory()->log('error', 'NextCloud Import Error', [
+                'error' => $e->getMessage(),
+                'path' => $path,
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         }
     }
 
-    /**
-     * Get file type based on extension
-     * 
-     * @param string $filename
-     * @return string
-     */
-    private function getFileType(string $filename): string {
+    private function getFileType($filename) {
         $ext = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
         $imageTypes = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'];
         $documentTypes = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'md', 'rtf'];
         $archiveTypes = ['zip', 'rar', '7z', 'tar', 'gz', 'bz2'];
         $audioTypes = ['mp3', 'wav', 'ogg', 'm4a', 'flac', 'aac'];
         $videoTypes = ['mp4', 'avi', 'mkv', 'mov', 'webm', 'flv', 'wmv'];
-
+        
         if (in_array($ext, $imageTypes)) return 'image';
         if (in_array($ext, $documentTypes)) return 'document';
         if (in_array($ext, $archiveTypes)) return 'archive';
@@ -320,13 +376,7 @@ class NextCloud {
         return 'file';
     }
 
-    /**
-     * Format file size
-     * 
-     * @param int $bytes
-     * @return string
-     */
-    private function formatSize(int $bytes): string {
+    private function formatSize($bytes) {
         $units = ['B', 'KB', 'MB', 'GB', 'TB'];
         $bytes = max($bytes, 0);
         $pow = floor(($bytes ? log($bytes) : 0) / log(1024));

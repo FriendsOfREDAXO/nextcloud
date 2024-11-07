@@ -1,9 +1,13 @@
 let currentPath = '/';
+let selectedFiles = new Set();
 
 function loadFiles(path = '/') {
     currentPath = path;
+    selectedFiles.clear();
+    updateToolbar();
+    
     const fileList = document.getElementById('fileList');
-    fileList.innerHTML = '<tr><td colspan="5" class="text-center"><i class="rex-icon fa-spinner fa-spin"></i></td></tr>';
+    fileList.innerHTML = '<tr><td colspan="6" class="text-center"><i class="rex-icon fa-spinner fa-spin"></i></td></tr>';
     
     const params = {
         page: 'nextcloud/main',
@@ -26,7 +30,7 @@ function loadFiles(path = '/') {
         })
         .catch(error => {
             const errorMsg = document.createElement('tr');
-            errorMsg.innerHTML = `<td colspan="5" class="alert alert-danger">${error.message}</td>`;
+            errorMsg.innerHTML = `<td colspan="6" class="alert alert-danger">${error.message}</td>`;
             fileList.innerHTML = '';
             fileList.appendChild(errorMsg);
             alert('Fehler: ' + error.message);
@@ -41,6 +45,7 @@ function renderFiles(files) {
         const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
         fileList.innerHTML += `
             <tr class="folder-row" style="cursor: pointer;" data-path="${parentPath}">
+                <td style="width: 30px;"></td>
                 <td><i class="rex-icon fa-level-up"></i></td>
                 <td colspan="3">..</td>
                 <td></td>
@@ -50,43 +55,189 @@ function renderFiles(files) {
     files.sort((a, b) => {
         if (a.type === 'folder' && b.type !== 'folder') return -1;
         if (a.type !== 'folder' && b.type === 'folder') return 1;
-        return a.name.localeCompare(b.name);
+        return decodeURIComponent(a.name).localeCompare(decodeURIComponent(b.name));
     });
     
     files.forEach(file => {
         const icon = getFileIcon(file.type);
-        const action = file.type === 'folder' 
-            ? `<button class="btn btn-default btn-xs"><i class="rex-icon fa-chevron-right"></i></button>`
-            : `<button class="btn btn-primary btn-xs" onclick="event.stopPropagation(); importFile('${file.path}')"><i class="rex-icon fa-upload"></i></button>`;
-            
         const rowClass = file.type === 'folder' ? 'folder-row' : '';
+        const decodedName = decodeURIComponent(file.name);
         
-        // Klickbares Icon/Name für Bildvorschau
+        // Checkbox nur für Dateien, nicht für Ordner
+        const checkbox = file.type !== 'folder' 
+            ? `<input type="checkbox" class="file-select" data-path="${file.path}" style="transform: scale(1.2);"${selectedFiles.has(file.path) ? ' checked' : ''}>`
+            : '';
+        
+        // Name mit oder ohne Link für Bildvorschau und Word-Break
         const nameContent = file.type === 'image' 
-            ? `<a href="#" onclick="event.stopPropagation(); previewImage('${file.path}', '${file.name}'); return false;">${file.name}</a>`
-            : file.name;
+            ? `<a href="#" onclick="event.stopPropagation(); previewImage('${file.path}', '${decodedName}'); return false;" style="word-break: break-word;">${decodedName}</a>`
+            : `<span style="word-break: break-word;">${decodedName}</span>`;
             
         fileList.innerHTML += `
             <tr class="${rowClass}" ${file.type === 'folder' ? 'data-path="' + file.path + '"' : ''} style="${file.type === 'folder' ? 'cursor: pointer;' : ''}">
-                <td style="width: 50px; text-align: center;">
+                <td style="width: 30px; text-align: center; vertical-align: middle;">
+                    ${checkbox}
+                </td>
+                <td style="width: 50px; text-align: center; vertical-align: middle;">
                     ${file.type === 'image' 
-                        ? `<a href="#" onclick="event.stopPropagation(); previewImage('${file.path}', '${file.name}'); return false;"><i class="rex-icon ${icon}"></i></a>` 
+                        ? `<a href="#" onclick="event.stopPropagation(); previewImage('${file.path}', '${decodedName}'); return false;"><i class="rex-icon ${icon}"></i></a>` 
                         : `<i class="rex-icon ${icon}"></i>`}
                 </td>
-                <td>${nameContent}</td>
-                <td>${file.size || ''}</td>
-                <td>${file.modified || ''}</td>
-                <td>${action}</td>
+                <td style="max-width: 500px; vertical-align: middle;">${nameContent}</td>
+                <td style="width: 100px; vertical-align: middle;">${file.size || ''}</td>
+                <td style="width: 150px; vertical-align: middle;">${file.modified || ''}</td>
+                <td style="width: 60px; vertical-align: middle;">
+                    ${file.type !== 'folder' ? `
+                        <button class="btn btn-primary btn-xs" onclick="event.stopPropagation(); importFile('${file.path}')">
+                            <i class="rex-icon fa-upload"></i>
+                        </button>
+                    ` : `
+                        <button class="btn btn-default btn-xs">
+                            <i class="rex-icon fa-chevron-right"></i>
+                        </button>
+                    `}
+                </td>
             </tr>`;
     });
 
-    // Event-Handler für Ordner-Klicks
+    // Event-Handler für Ordner-Klicks bleiben gleich
     $('.folder-row').on('click', function() {
         const path = $(this).data('path');
         if (path) {
             loadFiles(path);
         }
     });
+
+    // Event-Handler für Checkboxen bleiben gleich
+    $('.file-select').on('change', function(e) {
+        e.stopPropagation();
+        const path = $(this).data('path');
+        if (this.checked) {
+            selectedFiles.add(path);
+        } else {
+            selectedFiles.delete(path);
+        }
+        updateToolbar();
+    });
+}
+
+function updateToolbar() {
+    // Aktualisiere den Import-Button im Header basierend auf der Auswahl
+    const headerButtons = $('.panel-heading .btn-group');
+    const importButton = headerButtons.find('#btnImportSelected');
+    
+    if (selectedFiles.size > 0) {
+        if (!importButton.length) {
+            headerButtons.prepend(`
+                <button class="btn btn-primary btn-xs" id="btnImportSelected" style="margin-right: 10px;">
+                    <i class="rex-icon fa-upload"></i> ${selectedFiles.size} importieren
+                </button>
+            `);
+            $('#btnImportSelected').on('click', importSelectedFiles);
+        } else {
+            importButton.html(`<i class="rex-icon fa-upload"></i> ${selectedFiles.size} importieren`);
+        }
+    } else {
+        importButton.remove();
+    }
+}
+
+async function importSelectedFiles() {
+    const categoryId = $('#rex-mediapool-category').val();
+    let imported = 0;
+    let failed = [];
+
+    // Progress Modal
+    const modal = $(`
+        <div class="modal fade" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">Importiere Dateien...</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                        <div id="import-status" class="text-center" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    
+    modal.modal({backdrop: 'static', keyboard: false});
+
+    const files = Array.from(selectedFiles);
+    const total = files.length;
+    let processed = 0;
+
+    for (const path of files) {
+        const fileName = decodeURIComponent(path.split('/').pop());
+        
+        try {
+            modal.find('#import-status').text(
+                `Importiere "${fileName}" (${processed + 1} von ${total})`
+            );
+
+            const params = {
+                page: 'nextcloud/main',
+                nextcloud_api: '1',
+                action: 'import',
+                path: path,
+                category_id: categoryId
+            };
+            
+            const url = 'index.php?' + $.param(params);
+            
+            const response = await fetch(url);
+            const data = await response.json();
+
+            if (data.success) {
+                imported++;
+            } else {
+                failed.push({
+                    name: fileName,
+                    error: data.error || 'Unbekannter Fehler'
+                });
+            }
+
+            // Kleine Pause zwischen den Importen
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+        } catch (error) {
+            failed.push({
+                name: fileName,
+                error: error.message
+            });
+        }
+
+        processed++;
+        const progress = Math.round((processed / total) * 100);
+        modal.find('.progress-bar')
+            .css('width', progress + '%')
+            .text(progress + '%');
+    }
+
+    // Fertig
+    setTimeout(() => {
+        modal.modal('hide');
+        
+        // Detaillierte Zusammenfassung
+        if (failed.length > 0) {
+            let message = `Import abgeschlossen:\n\n`;
+            message += `${imported} Dateien erfolgreich importiert\n`;
+            message += `${failed.length} Fehler:\n\n`;
+            failed.forEach(({name, error}) => {
+                message += `- ${name}: ${error}\n`;
+            });
+            alert(message);
+        } else {
+            alert(`Alle ${imported} Dateien wurden erfolgreich importiert.`);
+        }
+        
+        loadFiles(currentPath);
+    }, 500);
 }
 
 function getFileIcon(type) {
@@ -143,6 +294,7 @@ function previewImage(path, name) {
 
 function importFile(path) {
     const categoryId = $('#rex-mediapool-category').val();
+    const fileName = decodeURIComponent(path.split('/').pop());
     
     const params = {
         page: 'nextcloud/main',
@@ -167,7 +319,7 @@ function importFile(path) {
             }
         })
         .catch(error => {
-            alert('Fehler beim Import: ' + error.message);
+            alert(`Fehler beim Import von "${fileName}": ${error.message}`);
         });
 }
 
@@ -184,8 +336,8 @@ function updateBreadcrumb(path) {
             const isLast = index === parts.length - 1;
             
             breadcrumb += isLast 
-                ? `/ ${part} `
-                : `/ <a href="#" onclick="loadFiles('${currentBuildPath}'); return false;">${part}</a> `;
+                ? `/ ${decodeURIComponent(part)} `
+                : `/ <a href="#" onclick="loadFiles('${currentBuildPath}'); return false;">${decodeURIComponent(part)}</a> `;
         });
     }
     
