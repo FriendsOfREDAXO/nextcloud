@@ -1,8 +1,17 @@
-package: addon_key
-version: '0.0.0'
-author: 'Friends Of REDAXO'
-supportpage: https://github.com/FriendsOfREDAXO/addon_key
+package: nextcloud
+version: '1.0.0'
+author: KLXM
+supportpage: https://github.com/klxm/nextcloud
+
 requires:
-    redaxo: '^5.15.1'
+    redaxo: '^5.13.0'
     php:
-        version: '>=8.1, <9'
+        version: '>=7.4'
+
+page:
+    title: NextCloud
+    perm: admin[]
+    icon: rex-icon fa-cloud
+    subpages:
+        main: { title: 'Dateien' }
+        config: { title: 'Einstellungen' }
