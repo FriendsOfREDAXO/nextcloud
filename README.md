@@ -67,7 +67,7 @@ https://github.com/nextcloud/server/tree/master/LICENSES
 
 ## Author
 
-KLXM Crossmedia GmbH, THomas Skerbis
+KLXM Crossmedia GmbH, Thomas Skerbis
 
 ## Support & Bugs
 
