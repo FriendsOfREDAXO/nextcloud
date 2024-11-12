@@ -1,0 +1,21 @@
+nextcloud = NextCloud
+nextcloud_configuration = Configuration
+
+nextcloud_title = Nextcloud media import
+nextcloud_config = Settings
+nextcloud_config_saved = Settings have been saved
+nextcloud_config_missing = Please configure the NextCloud connection first
+
+nextcloud_baseurl = NextCloud URL
+nextcloud_username = Username
+nextcloud_password = App password
+nextcloud_password_notice = Please use an app password from the NextCloud settings
+
+nextcloud_target_category = Target category
+nextcloud_filename = file name
+nextcloud_filesize = Size
+nextcloud_modified = Modified
+nextcloud_refresh = Refresh
+
+nextcloud_import_success = File was successfully imported into the media pool
+nextcloud_import_error = Error importing the file
