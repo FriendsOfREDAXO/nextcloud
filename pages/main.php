@@ -1,6 +1,8 @@
 <?php
 namespace Klxm\Nextcloud;
 
+use rex_i18n; 
+
 // Prüfe Konfiguration
 if (!\rex_config::get('nextcloud', 'baseurl') || !\rex_config::get('nextcloud', 'username') || !\rex_config::get('nextcloud', 'password')) {
     echo \rex_view::warning(rex_i18n::msg('nextcloud_config_missing'));
