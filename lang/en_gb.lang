@@ -3,6 +3,10 @@ nextcloud_configuration = Configuration
 
 nextcloud_title = Nextcloud media import
 nextcloud_config = Settings
+
+nextcloud_files = Files
+nextcloud_settings = Settings
+
 nextcloud_config_saved = Settings have been saved
 nextcloud_config_missing = Please configure the NextCloud connection first
 
