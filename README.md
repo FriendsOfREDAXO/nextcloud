@@ -1,9 +1,5 @@
 # NextCloud AddOn für REDAXO
 
-## WORK in progress
-
-🚨 Noch nicht für den produktiven Einsatz
-
 Ein praktisches AddOn zur Integration einer NextCloud-Instanz in REDAXO. Es ermöglicht den direkten Import von Dateien aus der NextCloud in den REDAXO-Medienpool.
 
 ## Features
@@ -72,12 +68,3 @@ KLXM Crossmedia GmbH, Thomas Skerbis
 ## Support & Bugs
 
 Fehler bitte auf GitHub melden: https://github.com/klxm/nextcloud
-
-## Changelog
-
-### Version 0.0.1
-- Initiale Version
-- Grundlegende Funktionalität zum Durchsuchen und Importieren
-- Bildvorschau
-- Kategorieauswahl
-- Verschiedene Dateitypen-Unterstützung
