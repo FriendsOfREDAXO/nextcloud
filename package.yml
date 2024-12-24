@@ -13,5 +13,5 @@ page:
     perm: admin[]
     icon: rex-icon fa-cloud
     subpages:
-        main: { title: 'Dateien' }
-        config: { title: 'Einstellungen' }
+        main: { title: 'translate:file'}
+        config: { title: 'translate:settings'}
