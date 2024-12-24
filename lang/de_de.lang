@@ -2,6 +2,9 @@ nextcloud = NextCloud
 nextcloud_configuration = Konfiguration
 
 nextcloud_title = Nextcloud Media-Import
+nextclout_files = Dateien
+nextclout_settings = Einstellungen
+
 nextcloud_config = Einstellungen
 nextcloud_config_saved = Einstellungen wurden gespeichert
 nextcloud_config_missing = Bitte konfigurieren Sie zuerst die NextCloud-Verbindung
