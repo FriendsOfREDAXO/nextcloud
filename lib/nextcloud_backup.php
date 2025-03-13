@@ -28,12 +28,12 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         
         // Prüfen ob mindestens eine Backup-Art ausgewählt wurde
         if (!$backup_db && !$backup_files) {
-            return [false, rex_i18n::msg('backup_no_type_selected')];
+            return [false, rex_i18n::msg('nextcloud_backup_no_type_selected')];
         }
 
         // Prüfen ob alle Nextcloud-Zugangsdaten angegeben wurden
         if (empty($nextcloud_url) || empty($nextcloud_username) || empty($nextcloud_password)) {
-            return [false, rex_i18n::msg('nextcloud_credentials_incomplete')];
+            return [false, rex_i18n::msg('nextcloud_config_missing')];
         }
 
         // Basis-Verzeichnis für temporäre Backups
@@ -51,7 +51,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         $webdav_client = $this->initWebDavClient($nextcloud_url, $nextcloud_username, $nextcloud_password);
         
         if ($webdav_client === false) {
-            return [false, rex_i18n::msg('nextcloud_webdav_init_error')];
+            return [false, rex_i18n::msg('nextcloud_backup_connection_error')];
         }
         
         // Stellen Sie sicher, dass die Zielverzeichnisse in der Nextcloud existieren
@@ -85,9 +85,9 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                 
                 if ($return_var !== 0) {
                     $success = false;
-                    $message[] = rex_i18n::msg('backup_db_error') . ': ' . implode("\n", $output);
+                    $message[] = rex_i18n::msg('nextcloud_backup_db_error') . ': ' . implode("\n", $output);
                 } else {
-                    $message[] = rex_i18n::msg('backup_db_success') . ': ' . basename($db_file);
+                    $message[] = rex_i18n::msg('nextcloud_backup_db_success') . ': ' . basename($db_file);
                     
                     // In Nextcloud hochladen
                     $upload_result = $this->uploadToNextcloud(
@@ -97,15 +97,15 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                     );
                     
                     if ($upload_result) {
-                        $message[] = rex_i18n::msg('backup_db_upload_success');
+                        $message[] = rex_i18n::msg('nextcloud_backup_db_upload_success');
                     } else {
                         $success = false;
-                        $message[] = rex_i18n::msg('backup_db_upload_error');
+                        $message[] = rex_i18n::msg('nextcloud_backup_db_upload_error');
                     }
                 }
             } catch (Exception $e) {
                 $success = false;
-                $message[] = rex_i18n::msg('backup_db_exception') . ': ' . $e->getMessage();
+                $message[] = rex_i18n::msg('nextcloud_backup_db_exception') . ': ' . $e->getMessage();
             }
         }
         
@@ -141,9 +141,9 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                 
                 if ($return_var !== 0) {
                     $success = false;
-                    $message[] = rex_i18n::msg('backup_files_error') . ': ' . implode("\n", $output);
+                    $message[] = rex_i18n::msg('nextcloud_backup_files_error') . ': ' . implode("\n", $output);
                 } else {
-                    $message[] = rex_i18n::msg('backup_files_success') . ': ' . basename($files_file);
+                    $message[] = rex_i18n::msg('nextcloud_backup_files_success') . ': ' . basename($files_file);
                     
                     // In Nextcloud hochladen
                     $upload_result = $this->uploadToNextcloud(
@@ -153,15 +153,15 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                     );
                     
                     if ($upload_result) {
-                        $message[] = rex_i18n::msg('backup_files_upload_success');
+                        $message[] = rex_i18n::msg('nextcloud_backup_files_upload_success');
                     } else {
                         $success = false;
-                        $message[] = rex_i18n::msg('backup_files_upload_error');
+                        $message[] = rex_i18n::msg('nextcloud_backup_files_upload_error');
                     }
                 }
             } catch (Exception $e) {
                 $success = false;
-                $message[] = rex_i18n::msg('backup_files_exception') . ': ' . $e->getMessage();
+                $message[] = rex_i18n::msg('nextcloud_backup_files_exception') . ': ' . $e->getMessage();
             }
         }
         
@@ -170,10 +170,10 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
             try {
                 $this->cleanupOldBackups($webdav_client, $nextcloud_path . '/db', $max_backups);
                 $this->cleanupOldBackups($webdav_client, $nextcloud_path . '/files', $max_backups);
-                $message[] = rex_i18n::msg('backup_cleanup_success', $max_backups);
+                $message[] = rex_i18n::msg('nextcloud_backup_cleanup_success', $max_backups);
             } catch (Exception $e) {
                 $success = false;
-                $message[] = rex_i18n::msg('backup_cleanup_error') . ': ' . $e->getMessage();
+                $message[] = rex_i18n::msg('nextcloud_backup_cleanup_error') . ': ' . $e->getMessage();
             }
         }
         
@@ -195,7 +195,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
     {
         // Überprüfen, ob cURL verfügbar ist
         if (!function_exists('curl_init')) {
-            throw new Exception(rex_i18n::msg('nextcloud_curl_not_available'));
+            throw new Exception(rex_i18n::msg('nextcloud_backup_curl_not_available'));
         }
         
         // Stellen Sie sicher, dass die URL mit einem Slash endet
@@ -224,11 +224,11 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         
         if ($status === 0) {
-            throw new Exception(rex_i18n::msg('nextcloud_connection_error') . ': ' . curl_error($ch));
+            throw new Exception(rex_i18n::msg('nextcloud_backup_connection_error') . ': ' . curl_error($ch));
         }
         
         if ($status >= 400) {
-            throw new Exception(rex_i18n::msg('nextcloud_auth_failed', $status));
+            throw new Exception(rex_i18n::msg('nextcloud_backup_auth_failed', $status));
         }
         
         // cURL-Handle zurücksetzen
@@ -263,7 +263,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
             $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
             
             if ($status >= 400) {
-                throw new Exception(rex_i18n::msg('nextcloud_dir_create_error', $path, $status));
+                throw new Exception(rex_i18n::msg('nextcloud_backup_dir_create_error', $path, $status));
             }
         }
         
@@ -284,7 +284,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         $file_handle = fopen($local_file, 'r');
         
         if ($file_handle === false) {
-            throw new Exception(rex_i18n::msg('nextcloud_local_file_open_error', $local_file));
+            throw new Exception(rex_i18n::msg('nextcloud_backup_local_file_open_error', $local_file));
         }
         
         // cURL für den Upload konfigurieren
@@ -325,7 +325,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
         
         if ($status >= 400) {
-            throw new Exception(rex_i18n::msg('nextcloud_dir_list_error', $directory, $status));
+            throw new Exception(rex_i18n::msg('nextcloud_backup_dir_list_error', $directory, $status));
         }
         
         // XML-Antwort parsen
@@ -363,7 +363,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                 $delete_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
                 
                 if ($delete_status >= 400) {
-                    throw new Exception(rex_i18n::msg('nextcloud_file_delete_error', basename($href), $delete_status));
+                    throw new Exception(rex_i18n::msg('nextcloud_backup_file_delete_error', basename($href), $delete_status));
                 }
             }
         }
@@ -390,17 +390,17 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
     
     public function getTypeName()
     {
-        return rex_i18n::msg('nexcloud_backup_type_name');
+        return rex_i18n::msg('nextcloud_backup_type_name');
     }
     
     public function getParamFields()
     {
         return [
             [
-                'label' => rex_i18n::msg('nextcloud_url'),
+                'label' => rex_i18n::msg('nextcloud_baseurl'),
                 'name' => 'nextcloud_url',
                 'type' => 'text',
-                'notice' => rex_i18n::msg('nextcloud_url_notice')
+                'notice' => rex_i18n::msg('nextcloud_backup_url_notice')
             ],
             [
                 'label' => rex_i18n::msg('nextcloud_username'),
@@ -415,26 +415,26 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                 'notice' => rex_i18n::msg('nextcloud_password_notice')
             ],
             [
-                'label' => rex_i18n::msg('nextcloud_path'),
+                'label' => rex_i18n::msg('nextcloud_backup_path'),
                 'name' => 'nextcloud_path',
                 'type' => 'text',
-                'notice' => rex_i18n::msg('nextcloud_path_notice')
+                'notice' => rex_i18n::msg('nextcloud_backup_path_notice')
             ],
             [
-                'label' => rex_i18n::msg('backup_max_count'),
+                'label' => rex_i18n::msg('nextcloud_backup_max_count'),
                 'name' => 'max_backups',
                 'type' => 'text',
                 'default' => '5'
             ],
             [
-                'label' => rex_i18n::msg('backup_database'),
+                'label' => rex_i18n::msg('nextcloud_backup_database'),
                 'name' => 'backup_db',
                 'type' => 'select',
                 'options' => ['0' => rex_i18n::msg('no'), '1' => rex_i18n::msg('yes')],
                 'default' => '1'
             ],
             [
-                'label' => rex_i18n::msg('backup_files'),
+                'label' => rex_i18n::msg('nextcloud_backup_files'),
                 'name' => 'backup_files',
                 'type' => 'select',
                 'options' => ['0' => rex_i18n::msg('no'), '1' => rex_i18n::msg('yes')],
