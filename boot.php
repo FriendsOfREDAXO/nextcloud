@@ -3,7 +3,7 @@ namespace Klxm\Nextcloud;
 
 
 if (\rex_addon::get('nextcloud')->isAvailable()) {
-    \rex_cronjob_manager::registerType(rex_cronjob_redaxo_backup::class);
+    \rex_cronjob_manager::registerType(\rex_cronjob_redaxo_backup::class);
 }
 
 // Nur im Backend ausführen
