@@ -390,7 +390,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
     
     public function getTypeName()
     {
-        return rex_i18n::msg('backup_type_name');
+        return rex_i18n::msg('nexcloud_backup_type_name');
     }
     
     public function getParamFields()
