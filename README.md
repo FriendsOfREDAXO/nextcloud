@@ -47,10 +47,69 @@ Nach erfolgreicher Konfiguration:
 - Audio: mp3, wav, ogg, m4a, flac, aac
 - Video: mp4, avi, mkv, mov, webm, flv, wmv
 
+## NextCloud Backup-Cronjob
+
+Mit diesem Addon ist ein spezieller Cronjob für automatische Backups verfügbar, der Datenbank- und Dateisystem-Backups automatisch in eine NextCloud-Instanz hochlädt.
+
+### Voraussetzungen
+
+- Eine NextCloud-Instanz mit WebDAV-Zugang
+- App-Passwort für den NextCloud-Benutzer (aus Sicherheitsgründen empfohlen)
+- cURL-Unterstützung auf dem Server
+- mysqldump und tar müssen auf dem Server verfügbar sein
+
+### Einrichtung
+
+1. Navigiere im REDAXO-Backend zu "Cronjobs" → "Cronjobs"
+2. Klicke auf "Cronjob hinzufügen"
+3. Wähle als Typ "REDAXO Backup (NextCloud)" aus
+4. Konfiguriere die folgenden Einstellungen:
+
+#### Konfiguration
+
+| Einstellung | Beschreibung |
+|-------------|--------------|
+| NextCloud URL | Die URL deiner NextCloud-Instanz (z.B. https://nextcloud.example.com/) |
+| Benutzername | Dein NextCloud-Benutzername |
+| App-Passwort | Ein in den NextCloud-Einstellungen generiertes App-Passwort |
+| NextCloud Pfad | Das Zielverzeichnis in der NextCloud (z.B. backups/redaxo) |
+| Maximale Anzahl Backups | Ältere Backups werden automatisch gelöscht, wenn diese Anzahl überschritten wird |
+| Datenbank sichern | Legt fest, ob die Datenbank gesichert werden soll |
+| Dateisystem sichern | Legt fest, ob die Dateien gesichert werden sollen |
+
+5. Konfiguriere die Ausführungshäufigkeit des Cronjobs (täglich, wöchentlich, etc.)
+6. Speichere den Cronjob
+
+### Backup-Struktur
+
+Die Backups werden in der NextCloud in folgender Struktur gespeichert:
+
+```
+[Zielverzeichnis]/
+  ├── db/
+  │   ├── redaxo_db_2025-03-13_10-00-00.sql.gz
+  │   └── ...
+  └── files/
+      ├── redaxo_files_2025-03-13_10-00-00.tar.gz
+      └── ...
+```
+
+### Hinweise
+
+- Die temporären Backup-Dateien werden im Verzeichnis `/backup` im REDAXO-Hauptverzeichnis erstellt und nach dem Upload wieder gelöscht
+- Folgende Verzeichnisse werden beim Dateisystem-Backup ausgeschlossen:
+  - `backup/`
+  - `cache/`
+  - `redaxo/cache/`
+  - `redaxo/data/cache/`
+  - `media/cache/`
+- Der Cronjob kann manuell über die REDAXO-Backend-Oberfläche ausgeführt werden, um die Funktionalität zu testen
+
 ## Systemvoraussetzungen
 
-- REDAXO 5.13.0 oder höher
-- PHP 7.4 oder höher
+- REDAXO 5.18.0 oder höher
+- PHP 8.1 oder höher
+- exec
 - HTTPS-fähige NextCloud-Installation
 
 ## Lizenz des AddOns
