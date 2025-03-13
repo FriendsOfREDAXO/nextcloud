@@ -9,6 +9,7 @@ Ein praktisches AddOn zur Integration einer NextCloud-Instanz in REDAXO. Es erm√
 - Einfacher Import per Klick in den Medienpool
 - Kategorisierung der importierten Dateien
 - Unterst√ºtzung verschiedener Dateitypen
+- Backup-Cron zu NextCloud
 
 ## Installation 
 
