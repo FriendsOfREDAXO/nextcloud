@@ -70,6 +70,7 @@ nextcloud_import_error = Fehler beim Import der Datei
 
 # Zusätzliche Übersetzungen für den Backup-Cronjob
 nextcloud_backup = NextCloud Backup
+nexcloud_backup_type_name = NextCloud Backup
 nextcloud_backup_configuration = Backup Konfiguration
 nextcloud_backup_no_type_selected = Es wurde weder Datenbank- noch Dateisystem-Backup ausgewählt.
 nextcloud_backup_type_name = REDAXO Backup (NextCloud)
