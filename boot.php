@@ -2,7 +2,7 @@
 namespace Klxm\Nextcloud;
 
 
-if (\rex_addon::get('nextcloud')->isAvailable()) {
+if (\rex_addon::get('cronjob')->isAvailable()) {
     \rex_cronjob_manager::registerType(\rex_cronjob_redaxo_backup::class);
 }
 
