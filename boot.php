@@ -31,6 +31,7 @@ if (\rex::isBackend() && \rex::getUser()) {
 
                 case 'preview':
                     // Für Bildvorschau senden wir direkt das Bild
+                    rex_response::cleanOutputBuffers(); // OutputBuffer leeren
                     $content = $api->getImageContent($path);
                     $filename = basename($path);
                     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
@@ -43,7 +44,6 @@ if (\rex::isBackend() && \rex::getUser()) {
                         'gif' => 'image/gif',
                         'webp' => 'image/webp'
                     ];
-                    rex_response::cleanOutputBuffers(); // OutputBuffer leeren
                     $contentType = $mimeTypes[$extension] ?? 'application/octet-stream';
                     header('Content-Type: ' . $contentType);
                     echo $content;
