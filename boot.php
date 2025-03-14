@@ -43,7 +43,7 @@ if (\rex::isBackend() && \rex::getUser()) {
                         'gif' => 'image/gif',
                         'webp' => 'image/webp'
                     ];
-                    
+                    rex_response::cleanOutputBuffers(); // OutputBuffer leeren
                     $contentType = $mimeTypes[$extension] ?? 'application/octet-stream';
                     header('Content-Type: ' . $contentType);
                     echo $content;
