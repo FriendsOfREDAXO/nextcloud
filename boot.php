@@ -31,7 +31,7 @@ if (\rex::isBackend() && \rex::getUser()) {
 
                 case 'preview':
                     // Für Bildvorschau senden wir direkt das Bild
-                    rex_response::cleanOutputBuffers(); // OutputBuffer leeren
+                    \rex_response::cleanOutputBuffers(); // OutputBuffer leeren
                     $content = $api->getImageContent($path);
                     $filename = basename($path);
                     $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
