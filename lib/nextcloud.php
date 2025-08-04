@@ -1,5 +1,5 @@
 <?php
-namespace Klxm\Nextcloud;
+namespace FriendsOfRedaxo\NextCloud;
 
 class NextCloud {
     private $baseUrl;
