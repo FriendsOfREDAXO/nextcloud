@@ -1,5 +1,5 @@
 <?php
-namespace Klxm\Nextcloud;
+namespace FriendsOfRedaxo\NextCloud;
 
 use rex_addon;
 use rex_be_controller;

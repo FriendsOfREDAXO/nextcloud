@@ -1,5 +1,5 @@
 <?php
-namespace Klxm\Nextcloud;
+namespace FriendsOfRedaxo\NextCloud;
 
 use rex_i18n; 
 

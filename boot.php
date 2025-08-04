@@ -1,5 +1,5 @@
 <?php
-namespace Klxm\Nextcloud;
+namespace FriendsOfRedaxo\NextCloud;
 
 
 if (\rex_addon::get('cronjob')->isAvailable()) {
