@@ -128,8 +128,8 @@ https://github.com/nextcloud/server/tree/master/LICENSES
 
 ## Author
 
-KLXM Crossmedia GmbH, Thomas Skerbis
+[Thomas Skerbis, KLXM Crossmedia GmbH](https://github.com/klxm)  
 
 ## Support & Bugs
 
-Fehler bitte auf GitHub melden: https://github.com/klxm/nextcloud
+Fehler bitte auf GitHub melden: [https://github.com/klxm/nextcloud](https://github.com/FriendsOfREDAXO/nextcloud/)
