@@ -53,16 +53,16 @@ $content = '
                 <thead>
                     <tr>
                         <th style="width: 30px">
-                            <label class="sr-only">Auswählen</label>
+                            <label class="sr-only">' . \rex_i18n::msg('nextcloud_js_select') . '</label>
                         </th>
                         <th style="width: 40px">
-                            <label class="sr-only">Typ</label>
+                            <label class="sr-only">' . \rex_i18n::msg('nextcloud_js_type') . '</label>
                         </th>
                         <th>' . \rex_i18n::msg('nextcloud_filename') . '</th>
                         <th style="width: 150px">' . \rex_i18n::msg('nextcloud_filesize') . '</th>
                         <th style="width: 150px">' . \rex_i18n::msg('nextcloud_modified') . '</th>
                         <th style="width: 100px">
-                            <label class="sr-only">Aktionen</label>
+                            <label class="sr-only">' . \rex_i18n::msg('nextcloud_js_actions') . '</label>
                         </th>
                     </tr>
                 </thead>
@@ -85,3 +85,22 @@ $content = '
 $fragment = new \rex_fragment();
 $fragment->setVar('body', $content, false);
 echo $fragment->parse('core/page/section.php');
+
+// Add translations for JavaScript
+echo '<script>
+window.nextcloudTranslations = {
+    error: "' . \rex_i18n::msg('nextcloud_js_error') . '",
+    importingFiles: "' . \rex_i18n::msg('nextcloud_js_importing_files') . '",
+    importingFile: "' . \rex_i18n::msg('nextcloud_js_importing_file') . '",
+    unknownError: "' . \rex_i18n::msg('nextcloud_js_unknown_error') . '",
+    importCompleted: "' . \rex_i18n::msg('nextcloud_js_import_completed') . '",
+    filesImportedSuccess: "' . \rex_i18n::msg('nextcloud_js_files_imported_success') . '",
+    errors: "' . \rex_i18n::msg('nextcloud_js_errors') . '",
+    allFilesImported: "' . \rex_i18n::msg('nextcloud_js_all_files_imported') . '",
+    close: "' . \rex_i18n::msg('nextcloud_js_close') . '",
+    import: "' . \rex_i18n::msg('nextcloud_js_import') . '",
+    fileImportedSuccess: "' . \rex_i18n::msg('nextcloud_js_file_imported_success') . '",
+    importError: "' . \rex_i18n::msg('nextcloud_js_import_error') . '",
+    importCount: "' . \rex_i18n::msg('nextcloud_js_import_count') . '"
+};
+</script>';

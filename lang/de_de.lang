@@ -52,3 +52,21 @@ nextcloud_backup_dir_list_error = Konnte das Verzeichnis {0} nicht auflisten: {1
 nextcloud_backup_file_delete_error = Konnte die Datei {0} nicht löschen: {1}
 nextcloud_yes = Ja
 nextcloud_no = Nein
+
+# JavaScript UI translations
+nextcloud_js_error = Fehler
+nextcloud_js_importing_files = Importiere Dateien...
+nextcloud_js_importing_file = Importiere "{0}" ({1} von {2})
+nextcloud_js_unknown_error = Unbekannter Fehler
+nextcloud_js_import_completed = Import abgeschlossen:
+nextcloud_js_files_imported_success = {0} Dateien erfolgreich importiert
+nextcloud_js_errors = {0} Fehler:
+nextcloud_js_all_files_imported = Alle {0} Dateien wurden erfolgreich importiert.
+nextcloud_js_close = Schließen
+nextcloud_js_import = Importieren
+nextcloud_js_file_imported_success = Datei erfolgreich importiert
+nextcloud_js_import_error = Fehler beim Import von "{0}"
+nextcloud_js_import_count = {0} importieren
+nextcloud_js_select = Auswählen
+nextcloud_js_type = Typ
+nextcloud_js_actions = Aktionen

@@ -1,27 +1,72 @@
 nextcloud = NextCloud
 nextcloud_configuration = Configuration
-
-nextcloud_title = Nextcloud media import
-nextcloud_config = Settings
-
+nextcloud_title = Nextcloud Media Import
 nextcloud_files = Files
 nextcloud_settings = Settings
-
+nextcloud_config = Settings
 nextcloud_config_saved = Settings have been saved
 nextcloud_config_missing = Please configure the NextCloud connection first
-
 nextcloud_baseurl = NextCloud URL
 nextcloud_username = Username
 nextcloud_password = App password
 nextcloud_password_notice = Please use an app password from the NextCloud settings
 nextcloud_rootfolder = Root folder
 nextcloud_rootfolder_notice = Start folder in NextCloud (e.g. /media or empty for root directory)
-
 nextcloud_target_category = Target category
-nextcloud_filename = file name
+nextcloud_filename = Filename
 nextcloud_filesize = Size
 nextcloud_modified = Modified
 nextcloud_refresh = Refresh
-
 nextcloud_import_success = File was successfully imported into the media pool
 nextcloud_import_error = Error importing the file
+
+# Additional translations for the backup cronjob
+nextcloud_backup = NextCloud Backup
+nextcloud_backup_configuration = Backup Configuration
+nextcloud_backup_no_type_selected = Neither database nor filesystem backup was selected.
+nextcloud_backup_type_name = REDAXO Backup (NextCloud)
+nextcloud_backup_url_notice = e.g. https://nextcloud.example.com/
+nextcloud_backup_path = NextCloud Path
+nextcloud_backup_path_notice = e.g. backups/redaxo
+nextcloud_backup_max_count = Maximum number of backups
+nextcloud_backup_database = Backup database
+nextcloud_backup_files = Backup filesystem
+nextcloud_backup_db_error = Error creating database backup
+nextcloud_backup_db_success = Database backup successfully created
+nextcloud_backup_db_upload_success = Database backup successfully uploaded to NextCloud
+nextcloud_backup_db_upload_error = Error uploading database backup to NextCloud
+nextcloud_backup_db_exception = Error during database backup
+nextcloud_backup_files_error = Error creating filesystem backup
+nextcloud_backup_files_success = Filesystem backup successfully created
+nextcloud_backup_files_upload_success = Filesystem backup successfully uploaded to NextCloud
+nextcloud_backup_files_upload_error = Error uploading filesystem backup to NextCloud
+nextcloud_backup_files_exception = Error during filesystem backup
+nextcloud_backup_cleanup_success = Old backups have been cleaned up (max. {0} kept)
+nextcloud_backup_cleanup_error = Error cleaning up old backups
+nextcloud_backup_curl_not_available = cURL is not available, but is required for WebDAV connections.
+nextcloud_backup_connection_error = Could not establish connection to NextCloud
+nextcloud_backup_auth_failed = NextCloud authentication failed with status {0}
+nextcloud_backup_dir_create_error = Could not create directory {0}: {1}
+nextcloud_backup_local_file_open_error = Could not open local file {0}.
+nextcloud_backup_dir_list_error = Could not list directory {0}: {1}
+nextcloud_backup_file_delete_error = Could not delete file {0}: {1}
+nextcloud_yes = Yes
+nextcloud_no = No
+
+# JavaScript UI translations
+nextcloud_js_error = Error
+nextcloud_js_importing_files = Importing files...
+nextcloud_js_importing_file = Importing "{0}" ({1} of {2})
+nextcloud_js_unknown_error = Unknown error
+nextcloud_js_import_completed = Import completed:
+nextcloud_js_files_imported_success = {0} files successfully imported
+nextcloud_js_errors = {0} errors:
+nextcloud_js_all_files_imported = All {0} files were successfully imported.
+nextcloud_js_close = Close
+nextcloud_js_import = Import
+nextcloud_js_file_imported_success = File successfully imported
+nextcloud_js_import_error = Error importing "{0}"
+nextcloud_js_import_count = Import {0}
+nextcloud_js_select = Select
+nextcloud_js_type = Type
+nextcloud_js_actions = Actions

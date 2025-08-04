@@ -33,7 +33,7 @@ function loadFiles(path = '/') {
             errorMsg.innerHTML = `<td colspan="6" class="alert alert-danger">${error.message}</td>`;
             fileList.innerHTML = '';
             fileList.appendChild(errorMsg);
-            alert('Fehler: ' + error.message);
+            alert(window.nextcloudTranslations.error + ': ' + error.message);
         });
 }
 
@@ -134,12 +134,12 @@ function updateToolbar() {
         if (!importButton.length) {
             headerButtons.prepend(`
                 <button class="btn btn-primary btn-xs" id="btnImportSelected" style="margin-right: 10px;">
-                    <i class="rex-icon fa-upload"></i> ${selectedFiles.size} importieren
+                    <i class="rex-icon fa-upload"></i> ${window.nextcloudTranslations.importCount.replace('{0}', selectedFiles.size)}
                 </button>
             `);
             $('#btnImportSelected').on('click', importSelectedFiles);
         } else {
-            importButton.html(`<i class="rex-icon fa-upload"></i> ${selectedFiles.size} importieren`);
+            importButton.html(`<i class="rex-icon fa-upload"></i> ${window.nextcloudTranslations.importCount.replace('{0}', selectedFiles.size)}`);
         }
     } else {
         importButton.remove();
@@ -157,7 +157,7 @@ async function importSelectedFiles() {
             <div class="modal-dialog" role="document">
                 <div class="modal-content">
                     <div class="modal-header">
-                        <h4 class="modal-title">Importiere Dateien...</h4>
+                        <h4 class="modal-title">${window.nextcloudTranslations.importingFiles}</h4>
                     </div>
                     <div class="modal-body">
                         <div class="progress">
@@ -181,7 +181,10 @@ async function importSelectedFiles() {
         
         try {
             modal.find('#import-status').text(
-                `Importiere "${fileName}" (${processed + 1} von ${total})`
+                window.nextcloudTranslations.importingFile
+                    .replace('{0}', fileName)
+                    .replace('{1}', processed + 1)
+                    .replace('{2}', total)
             );
 
             const params = {
@@ -202,7 +205,7 @@ async function importSelectedFiles() {
             } else {
                 failed.push({
                     name: fileName,
-                    error: data.error || 'Unbekannter Fehler'
+                    error: data.error || window.nextcloudTranslations.unknownError
                 });
             }
 
@@ -229,15 +232,15 @@ async function importSelectedFiles() {
         
         // Detaillierte Zusammenfassung
         if (failed.length > 0) {
-            let message = `Import abgeschlossen:\n\n`;
-            message += `${imported} Dateien erfolgreich importiert\n`;
-            message += `${failed.length} Fehler:\n\n`;
+            let message = window.nextcloudTranslations.importCompleted + '\n\n';
+            message += window.nextcloudTranslations.filesImportedSuccess.replace('{0}', imported) + '\n';
+            message += window.nextcloudTranslations.errors.replace('{0}', failed.length) + '\n\n';
             failed.forEach(({name, error}) => {
                 message += `- ${name}: ${error}\n`;
             });
             alert(message);
         } else {
-            alert(`Alle ${imported} Dateien wurden erfolgreich importiert.`);
+            alert(window.nextcloudTranslations.allFilesImported.replace('{0}', imported));
         }
         
         loadFiles(currentPath);
@@ -281,9 +284,9 @@ function previewImage(path, name) {
                         <img src="${previewUrl}" style="max-width: 100%; max-height: 70vh;" alt="${name}">
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-default" data-dismiss="modal">Schließen</button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">${window.nextcloudTranslations.close}</button>
                         <button type="button" class="btn btn-primary" onclick="importFile('${path}')">
-                            <i class="rex-icon fa-upload"></i> Importieren
+                            <i class="rex-icon fa-upload"></i> ${window.nextcloudTranslations.import}
                         </button>
                     </div>
                 </div>
@@ -329,7 +332,7 @@ function importFile(path) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                alert('Datei erfolgreich importiert');
+                alert(window.nextcloudTranslations.fileImportedSuccess);
                 loadFiles(currentPath);
                 // Wenn Modal offen ist, schließen
                 $('.modal').modal('hide');
@@ -338,7 +341,7 @@ function importFile(path) {
             }
         })
         .catch(error => {
-            alert(`Fehler beim Import von "${fileName}": ${error.message}`);
+            alert(window.nextcloudTranslations.importError.replace('{0}', fileName) + ': ' + error.message);
         });
 }
 
