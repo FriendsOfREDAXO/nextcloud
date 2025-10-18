@@ -3,7 +3,7 @@ namespace FriendsOfRedaxo\NextCloud;
 
 
 if (\rex_addon::get('cronjob')->isAvailable()) {
-    \rex_cronjob_manager::registerType(\rex_cronjob_redaxo_backup::class);
+    \rex_cronjob_manager::registerType(\FriendsOfRedaxo\NextCloud\rex_cronjob_redaxo_backup::class);
 }
 
 // Nur im Backend ausführen
