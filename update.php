@@ -8,9 +8,10 @@
 
 // Update cronjob class references from global namespace to namespaced version
 $sql = \rex_sql::factory();
+$newClassName = \FriendsOfRedaxo\NextCloud\rex_cronjob_redaxo_backup::class;
 $sql->setQuery("
     UPDATE " . \rex::getTable('cronjob') . "
-    SET type = 'FriendsOfRedaxo\\\\NextCloud\\\\rex_cronjob_redaxo_backup'
+    SET type = '" . $newClassName . "'
     WHERE type = 'rex_cronjob_redaxo_backup'
 ");
 
