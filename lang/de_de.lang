@@ -20,6 +20,29 @@ nextcloud_refresh = Aktualisieren
 nextcloud_import_success = Datei wurde erfolgreich in den Medienpool importiert
 nextcloud_import_error = Fehler beim Import der Datei
 
+# Share-Links
+nextcloud_sharing_title = Share-Links
+nextcloud_enable_sharing = Share-Links aktivieren
+nextcloud_enable_sharing_notice = Ermöglicht das Erstellen öffentlicher Nextcloud-Freigabe-Links aus dem Backend und über REX_NEXTCLOUD_SHARE im Modul-Output.
+nextcloud_share_title = Share-Link erstellen
+nextcloud_share_expiry = Ablaufdatum (optional)
+nextcloud_share_url = Share-Link
+nextcloud_share_create = Link erstellen
+nextcloud_share_copy = In Zwischenablage kopieren
+nextcloud_share_success = Share-Link wurde erfolgreich erstellt
+nextcloud_share_error = Fehler beim Erstellen des Share-Links
+nextcloud_share_cache_hint = Bereits erstellte Links werden gecacht und bei erneutem Aufruf wiederverwendet.
+
+# Metadaten-Mapping
+nextcloud_meta_mapping_title = Metadaten-Mapping (beim Import)
+nextcloud_meta_mapping_notice = Nextcloud-Tags werden beim Datei-Import automatisch in das angegebene REDAXO-Medienfeld übernommen. Das Feld muss als Spalte in der Tabelle rex_media existieren (z. B. über das metainfo-AddOn angelegt).
+nextcloud_tags_field = Nextcloud-Tags importieren als
+nextcloud_tags_field_notice = Name der Zielspalte in rex_media, z. B. med_description, med_keywords. Leer lassen, um Tags nicht zu importieren.
+
+# REX_VAR Hinweis
+nextcloud_var_hint_title = REX_NEXTCLOUD_SHARE verwenden
+nextcloud_var_hint_text = Share-Links können direkt in Modul-Outputs und Templates eingebettet werden:
+
 # Zusätzliche Übersetzungen für den Backup-Cronjob
 nextcloud_backup = NextCloud Backup
 nextcloud_backup_configuration = Backup Konfiguration

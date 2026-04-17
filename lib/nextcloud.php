@@ -418,4 +418,335 @@ class NextCloud {
         $bytes /= (1 << (10 * $pow));
         return round($bytes, 2) . ' ' . $units[$pow];
     }
+
+    // -------------------------------------------------------------------------
+    // Share Links (Nextcloud OCS Share API)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Erstellt einen öffentlichen Share-Link für eine Datei in der Nextcloud.
+     *
+     * @param string      $displayPath  Pfad relativ zum Root-Ordner (wie von listFiles geliefert)
+     * @param string|null $expireDate   Ablaufdatum im Format YYYY-MM-DD (optional)
+     * @param int         $permissions  1 = Lesen, 17 = Lesen + Download deaktiviert
+     *
+     * @return array{url: string, token: string, id: int, expiration: string|null}
+     * @throws \rex_exception
+     */
+    public function createShareLink(string $displayPath, ?string $expireDate = null, int $permissions = 1): array
+    {
+        $sharePath = $this->buildSharePath($displayPath);
+
+        $params = [
+            'path'       => $sharePath,
+            'shareType'  => 3, // 3 = öffentlicher Link
+            'permissions' => $permissions,
+        ];
+
+        if ($expireDate !== null && $expireDate !== '') {
+            // Sicherstellen, dass das Format stimmt
+            $timestamp = strtotime($expireDate);
+            if ($timestamp !== false) {
+                $params['expireDate'] = date('Y-m-d', $timestamp);
+            }
+        }
+
+        $result = $this->requestOcs('/apps/files_sharing/api/v1/shares', 'POST', $params);
+
+        $meta = $result['ocs']['meta'] ?? [];
+        if (($meta['status'] ?? '') !== 'ok') {
+            $code    = $meta['statuscode'] ?? 'unknown';
+            $message = $meta['message'] ?? 'Unknown error';
+            throw new \rex_exception('Share-Link konnte nicht erstellt werden (' . $code . '): ' . $message);
+        }
+
+        $data = $result['ocs']['data'] ?? [];
+        return [
+            'url'        => $data['url'] ?? '',
+            'token'      => $data['token'] ?? '',
+            'id'         => (int) ($data['id'] ?? 0),
+            'expiration' => $data['expiration'] ?? null,
+        ];
+    }
+
+    /**
+     * Baut den vollständigen Nextcloud-Pfad für die Share-API aus dem displayPath.
+     */
+    private function buildSharePath(string $displayPath): string
+    {
+        // Pfad vollständig dekodieren (kann URL-kodiert vom JS kommen)
+        $decoded = rawurldecode($displayPath);
+        $decoded = '/' . ltrim($decoded, '/');
+
+        if ($this->rootFolder !== '/') {
+            // rootFolder ist bereits als Klartext gespeichert
+            $root = rtrim(rawurldecode($this->rootFolder), '/');
+            return $root . $decoded;
+        }
+        return $decoded;
+    }
+
+    /**
+     * Führt einen OCS-API-Request durch (z. B. für Shares).
+     *
+     * @param string  $endpoint URL-Pfad ab /ocs/v2.php (z.B. /apps/files_sharing/api/v1/shares)
+     * @param string  $method   HTTP-Methode
+     * @param array<string,mixed> $params POST-Parameter
+     *
+     * @return array<mixed>
+     * @throws \rex_exception
+     */
+    private function requestOcs(string $endpoint, string $method = 'GET', array $params = []): array
+    {
+        $url = $this->baseUrl . '/ocs/v2.php' . $endpoint . '?format=json';
+
+        $ch = curl_init();
+
+        $headers = [
+            'OCS-APIRequest: true',
+            'Accept: application/json',
+        ];
+
+        $postBody = '';
+        if ($method === 'POST') {
+            // Alle Werte explizit als String casten, damit http_build_query integer korrekt serialisiert
+            $stringParams = [];
+            foreach ($params as $k => $v) {
+                $stringParams[(string) $k] = (string) $v;
+            }
+            $postBody = http_build_query($stringParams, '', '&');
+            $headers[] = 'Content-Type: application/x-www-form-urlencoded';
+            $headers[] = 'Content-Length: ' . strlen($postBody);
+        }
+
+        $options = [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD        => $this->username . ':' . $this->password,
+            CURLOPT_HTTPHEADER     => $headers,
+            CURLOPT_SSL_VERIFYPEER => (bool) \rex_config::get('nextcloud', 'ssl_verify', true),
+            CURLOPT_SSL_VERIFYHOST => \rex_config::get('nextcloud', 'ssl_verify', true) ? 2 : 0,
+            CURLOPT_HEADER         => false,
+            // FOLLOWLOCATION bei POST deaktivieren: cURL würde POST→GET konvertieren
+            // und den Body (inkl. shareType) beim Redirect verlieren
+            CURLOPT_FOLLOWLOCATION => false,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT        => 30,
+        ];
+
+        if ($method === 'POST') {
+            $options[CURLOPT_POST]       = true;
+            $options[CURLOPT_POSTFIELDS] = $postBody;
+        } else {
+            $options[CURLOPT_CUSTOMREQUEST] = $method;
+        }
+
+        \rex_logger::factory()->log('debug', 'NextCloud OCS Request', [
+            'url'      => $url,
+            'method'   => $method,
+            'postBody' => $postBody,
+            'headers'  => array_filter($headers, static fn($h) => !str_contains($h, 'Authorization')),
+        ]);
+        curl_setopt_array($ch, $options);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $effectiveUrl = curl_getinfo($ch, CURLINFO_EFFECTIVE_URL);
+
+        if (curl_errno($ch)) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            throw new \rex_exception('OCS API cURL-Fehler: ' . $error);
+        }
+        curl_close($ch);
+
+        \rex_logger::factory()->log('debug', 'NextCloud OCS Response', [
+            'url'          => $url,
+            'effectiveUrl' => $effectiveUrl,
+            'httpCode'     => $httpCode,
+            'response'     => is_string($response) ? substr($response, 0, 1000) : '',
+        ]);
+        // Redirect-Erkennung: wenn NC umleitet (301/302/307/308), Basis-URL korrigieren und retry
+        if (in_array($httpCode, [301, 302, 307, 308], true) && is_string($response)) {
+            throw new \rex_exception(
+                'OCS API: Nextcloud leitet weiter (HTTP ' . $httpCode . '). '
+                . 'Bitte die konfigurierte Basis-URL prüfen (HTTPS verwenden, ggf. Trailing-Slash entfernen).'
+            );
+        }
+
+        if ($httpCode < 200 || $httpCode >= 400) {
+            $detail = '';
+            if (is_string($response) && '' !== $response) {
+                $decoded = json_decode($response, true);
+                if (is_array($decoded)) {
+                    $detail = ' — ' . ($decoded['ocs']['meta']['message'] ?? substr($response, 0, 300));
+                } else {
+                    $detail = ' — ' . substr($response, 0, 300);
+                }
+            }
+            throw new \rex_exception('OCS API-Anfrage fehlgeschlagen (HTTP ' . $httpCode . ')' . $detail);
+        }
+
+        $data = json_decode((string) $response, true);
+        if (!is_array($data)) {
+            throw new \rex_exception('OCS API: Ungültige JSON-Antwort');
+        }
+
+        return $data;
+    }
+
+    // -------------------------------------------------------------------------
+    // Dateimetadaten (Tags über WebDAV PROPFIND)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Holt Nextcloud-Tags und die interne Datei-ID für einen Dateipfad.
+     *
+     * @param string $path Pfad relativ zum Root-Ordner
+     *
+     * @return array{fileid: string|null, tags: list<string>}
+     */
+    public function getFileTags(string $path): array
+    {
+        $url = $this->buildWebDavUrl($path);
+
+        $propfindBody = '<?xml version="1.0" encoding="utf-8"?>
+<d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+    <d:prop>
+        <oc:fileid/>
+        <oc:tags/>
+    </d:prop>
+</d:propfind>';
+
+        try {
+            $response = $this->requestPropfindCustom($url, $propfindBody, 0);
+        } catch (\Exception) {
+            return ['fileid' => null, 'tags' => []];
+        }
+
+        $response = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $response);
+
+        $prev = libxml_use_internal_errors(true);
+        try {
+            $xml = new \SimpleXMLElement((string) $response);
+        } catch (\Exception) {
+            libxml_use_internal_errors($prev);
+            return ['fileid' => null, 'tags' => []];
+        }
+        libxml_use_internal_errors($prev);
+
+        $xml->registerXPathNamespace('d', 'DAV:');
+        $xml->registerXPathNamespace('oc', 'http://owncloud.org/ns');
+
+        // File-ID
+        $fileId = null;
+        $fileIdNodes = $xml->xpath('//oc:fileid');
+        if (!empty($fileIdNodes)) {
+            $fileId = (string) $fileIdNodes[0];
+        }
+
+        // Tags – Nextcloud liefert sie entweder als <oc:tag> Kindelemente
+        // oder als kommaseparierten Text (je nach NC-Version)
+        $tags = [];
+        $tagChildren = $xml->xpath('//oc:tags/oc:tag');
+        if (!empty($tagChildren)) {
+            foreach ($tagChildren as $tag) {
+                $v = trim((string) $tag);
+                if ($v !== '') {
+                    $tags[] = $v;
+                }
+            }
+        } else {
+            $tagNodes = $xml->xpath('//oc:tags');
+            if (!empty($tagNodes)) {
+                $text = trim((string) $tagNodes[0]);
+                if ($text !== '') {
+                    $tags = array_values(array_filter(array_map('trim', explode(',', $text))));
+                }
+            }
+        }
+
+        return ['fileid' => $fileId, 'tags' => $tags];
+    }
+
+    /**
+     * PROPFIND mit benutzerdefiniertem Body und konfigurierbarem Depth.
+     *
+     * @throws \rex_exception
+     */
+    private function requestPropfindCustom(string $path, string $body, int $depth = 1): string
+    {
+        $url = $this->baseUrl . $path;
+        $ch  = curl_init();
+
+        $options = [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD        => $this->username . ':' . $this->password,
+            CURLOPT_HTTPHEADER     => [
+                'Content-Type: application/xml; charset=utf-8',
+                'Depth: ' . $depth,
+            ],
+            CURLOPT_SSL_VERIFYPEER => (bool) \rex_config::get('nextcloud', 'ssl_verify', true),
+            CURLOPT_SSL_VERIFYHOST => \rex_config::get('nextcloud', 'ssl_verify', true) ? 2 : 0,
+            CURLOPT_CUSTOMREQUEST  => 'PROPFIND',
+            CURLOPT_POSTFIELDS     => $body,
+            CURLOPT_HEADER         => false,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT        => 30,
+        ];
+
+        curl_setopt_array($ch, $options);
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+
+        if (curl_errno($ch)) {
+            $error = curl_error($ch);
+            curl_close($ch);
+            throw new \rex_exception('PROPFIND cURL-Fehler: ' . $error);
+        }
+        curl_close($ch);
+
+        if ($httpCode < 200 || $httpCode >= 400) {
+            throw new \rex_exception('PROPFIND fehlgeschlagen (HTTP ' . $httpCode . ')');
+        }
+
+        return (string) $response;
+    }
+
+    /**
+     * Wendet Nextcloud-Tags als REDAXO-Mediametadaten an (nach dem Import).
+     *
+     * @param string        $filename  Dateiname im Medienpool
+     * @param list<string>  $tags      Nextcloud-Tags
+     * @param string        $fieldName Zielspalte in rex_media (z. B. med_description)
+     */
+    public function applyTagsToMedia(string $filename, array $tags, string $fieldName): void
+    {
+        if ([] === $tags || '' === $fieldName) {
+            return;
+        }
+
+        // Prüfen ob die Spalte tatsächlich existiert
+        $sql     = \rex_sql::factory();
+        $columns = array_column(
+            $sql->getArray('SHOW COLUMNS FROM `' . \rex::getTablePrefix() . 'media`'),
+            'Field'
+        );
+
+        if (!in_array($fieldName, $columns, true)) {
+            \rex_logger::factory()->log('warning', 'NextCloud: Zielspalte für Tags nicht gefunden', [
+                'field' => $fieldName,
+            ]);
+            return;
+        }
+
+        $update = \rex_sql::factory();
+        $update->setTable(\rex::getTablePrefix() . 'media');
+        $update->setWhere(['filename' => $filename]);
+        $update->setValue($fieldName, implode(', ', $tags));
+        $update->setValue('updatedate', date(\rex_sql::FORMAT_DATETIME));
+        $update->setValue('updateuser', \rex::getUser() ? \rex::getUser()->getLogin() : 'nextcloud');
+        $update->update();
+    }
 }
