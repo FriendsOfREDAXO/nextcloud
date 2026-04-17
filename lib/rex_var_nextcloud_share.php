@@ -52,7 +52,7 @@ class rex_var_nextcloud_share extends rex_var
             return '';
         }
 
-        if (!\rex_config::get('nextcloud', 'enable_sharing', true)) {
+        if ('1' !== (string) \rex_config::get('nextcloud', 'enable_sharing', '1')) {
             return '';
         }
 

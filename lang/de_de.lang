@@ -23,6 +23,8 @@ nextcloud_import_error = Fehler beim Import der Datei
 # Share-Links
 nextcloud_sharing_title = Share-Links
 nextcloud_enable_sharing = Share-Links aktivieren
+nextcloud_enable_sharing_yes = Aktiviert
+nextcloud_enable_sharing_no = Deaktiviert
 nextcloud_enable_sharing_notice = Ermöglicht das Erstellen öffentlicher Nextcloud-Freigabe-Links aus dem Backend und über REX_NEXTCLOUD_SHARE im Modul-Output.
 nextcloud_share_title = Share-Link erstellen
 nextcloud_share_expiry = Ablaufdatum (optional)

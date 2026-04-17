@@ -10,7 +10,7 @@ if (\rex_post('config-submit', 'boolean')) {
         ['password', 'string'],
         ['rootfolder', 'string'],
         ['tags_field', 'string'],
-        ['enable_sharing', 'boolean'],
+        ['enable_sharing', 'string'],
     ]));
     
     echo \rex_view::success(\rex_i18n::msg('nextcloud_config_saved'));
@@ -58,7 +58,11 @@ $content .= '<h3>' . \rex_i18n::msg('nextcloud_sharing_title') . '</h3>';
 $formElements = [];
 $n = [];
 $n['label'] = '<label for="nextcloud-enable-sharing">' . \rex_i18n::msg('nextcloud_enable_sharing') . '</label>';
-$n['field'] = '<input type="checkbox" id="nextcloud-enable-sharing" name="config[enable_sharing]" value="1"' . ($this->getConfig('enable_sharing', true) ? ' checked' : '') . '>';
+$sharingEnabled = $this->getConfig('enable_sharing', '1');
+$n['field'] = '<select id="nextcloud-enable-sharing" name="config[enable_sharing]" class="form-control selectpicker">';
+$n['field'] .= '<option value="1"' . ('1' === $sharingEnabled ? ' selected' : '') . '>' . \rex_i18n::msg('nextcloud_enable_sharing_yes') . '</option>';
+$n['field'] .= '<option value="0"' . ('0' === $sharingEnabled ? ' selected' : '') . '>' . \rex_i18n::msg('nextcloud_enable_sharing_no') . '</option>';
+$n['field'] .= '</select>';
 $n['notice'] = \rex_i18n::msg('nextcloud_enable_sharing_notice');
 $formElements[] = $n;
 
@@ -83,7 +87,7 @@ $fragment->setVar('elements', $formElements, false);
 $content .= $fragment->parse('core/form/form.php');
 
 // REX_VAR Hinweis – nur anzeigen wenn Sharing aktiviert
-if ($this->getConfig('enable_sharing', true)) {
+if ('1' === $this->getConfig('enable_sharing', '1')) {
 $content .= '<div class="alert alert-info" style="margin-top:15px;">';
 $content .= '<strong>' . \rex_i18n::msg('nextcloud_var_hint_title') . '</strong><br>';
 $content .= \rex_i18n::msg('nextcloud_var_hint_text');

@@ -65,7 +65,7 @@ class rex_api_nextcloud extends rex_api_function
                     exit;
 
                 case 'share':
-                    if (!rex_config::get('nextcloud', 'enable_sharing', true)) {
+                    if ('1' !== (string) rex_config::get('nextcloud', 'enable_sharing', '1')) {
                         rex_response::sendJson(['success' => false, 'error' => 'Share-Links sind in den AddOn-Einstellungen deaktiviert.']);
                         exit;
                     }
