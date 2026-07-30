@@ -267,7 +267,10 @@ class NextCloud {
                     }
                 }
                 
-                $displayPath = $this->normalizePath($displayPath);
+                $displayPath = '/' . trim((string) preg_replace('#/+#', '/', $displayPath), '/');
+                if ($displayPath === '//') {
+                    $displayPath = '/';
+                }
                 
                 // Name aus dem Pfad extrahieren
                 $displayname = basename($displayPath);
@@ -389,6 +392,104 @@ class NextCloud {
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
+        }
+    }
+
+    /**
+     * Lädt eine bestehende Datei aus dem REDAXO-Medienpool in einen Nextcloud-Ordner hoch.
+     *
+     * @param string $mediaFilename Dateiname aus rex_media
+     * @param string $targetPath Zielordner (display path wie in listFiles, z. B. / oder /Bilder)
+     *
+     * @return array<string, string>
+     * @throws \rex_exception
+     */
+    public function uploadFromMediapool(string $mediaFilename, string $targetPath = '/'): array
+    {
+        $mediaFilename = trim($mediaFilename);
+        if ($mediaFilename === '') {
+            throw new \rex_exception('Kein Dateiname für den Upload übergeben.');
+        }
+
+        $this->assertSafeDisplayPath($targetPath);
+
+        $media = \rex_media::get($mediaFilename);
+        if (!$media) {
+            throw new \rex_exception('Die angegebene Medienpool-Datei existiert nicht.');
+        }
+
+        $localPath = \rex_path::media($mediaFilename);
+        if (!is_file($localPath)) {
+            throw new \rex_exception('Die Medienpool-Datei konnte lokal nicht gefunden werden.');
+        }
+
+        $content = \rex_file::get($localPath);
+
+        $normalizedTargetPath = '/' . trim(rawurldecode($targetPath), '/');
+        if ($normalizedTargetPath === '//') {
+            $normalizedTargetPath = '/';
+        }
+
+        $remoteFilePath = '/';
+        if ($normalizedTargetPath === '/') {
+            $remoteFilePath = '/' . $mediaFilename;
+        } else {
+            $remoteFilePath = $normalizedTargetPath . '/' . $mediaFilename;
+        }
+
+        $url = $this->buildWebDavUrl($remoteFilePath);
+        $this->request($url, 'PUT', $content);
+
+        return [
+            'filename' => $mediaFilename,
+            'target_path' => $normalizedTargetPath,
+            'remote_path' => $remoteFilePath,
+        ];
+    }
+
+    /**
+     * Löscht eine Datei in Nextcloud anhand des displayPath.
+     *
+     * @return array<string, string>
+     * @throws \rex_exception
+     */
+    public function deleteFile(string $displayPath): array
+    {
+        $this->assertSafeDisplayPath($displayPath);
+
+        $normalizedPath = '/' . trim(rawurldecode($displayPath), '/');
+        if ($normalizedPath === '/' || $normalizedPath === '//') {
+            throw new \rex_exception('Das Wurzelverzeichnis kann nicht gelöscht werden.');
+        }
+
+        $url = $this->buildWebDavUrl($normalizedPath);
+        try {
+            $this->request($url, 'DELETE');
+        } catch (\rex_exception $e) {
+            if (str_contains($e->getMessage(), 'status code: 403')) {
+                throw new \rex_exception('Löschen von Nextcloud verweigert (403). Bitte Rechte auf Datei/Ordner und mögliche Sperren prüfen.');
+            }
+            throw $e;
+        }
+
+        return [
+            'path' => $normalizedPath,
+        ];
+    }
+
+    /**
+     * Blockiert Pfad-Traversal im displayPath.
+     *
+     * @throws \rex_exception
+     */
+    private function assertSafeDisplayPath(string $displayPath): void
+    {
+        $decodedPath = rawurldecode($displayPath);
+        $segments = explode('/', trim($decodedPath, '/'));
+        foreach ($segments as $segment) {
+            if ($segment === '.' || $segment === '..') {
+                throw new \rex_exception('Ungültiger Zielpfad.');
+            }
         }
     }
 

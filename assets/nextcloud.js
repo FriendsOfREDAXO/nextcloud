@@ -73,6 +73,8 @@ function renderFiles(files) {
             ? `<a href="#" onclick="event.stopPropagation(); previewImage('${file.path}', '${decodedName}'); return false;" style="word-break: break-word;">${decodedName}</a>`
             : file.type === 'pdf'
             ? `<a href="#" onclick="event.stopPropagation(); previewPdf('${file.path}', '${decodedName}'); return false;" style="word-break: break-word;">${decodedName}</a>`
+            : file.type === 'video'
+            ? `<a href="#" onclick="event.stopPropagation(); previewVideo('${file.path}', '${decodedName}'); return false;" style="word-break: break-word;">${decodedName}</a>`
             : `<span style="word-break: break-word;">${decodedName}</span>`;
             
         fileList.innerHTML += `
@@ -85,6 +87,8 @@ function renderFiles(files) {
                         ? `<a href="#" onclick="event.stopPropagation(); previewImage('${file.path}', '${decodedName}'); return false;"><i class="rex-icon ${icon}"></i></a>` 
                         : file.type === 'pdf'
                         ? `<a href="#" onclick="event.stopPropagation(); previewPdf('${file.path}', '${decodedName}'); return false;"><i class="rex-icon ${icon}"></i></a>`
+                        : file.type === 'video'
+                        ? `<a href="#" onclick="event.stopPropagation(); previewVideo('${file.path}', '${decodedName}'); return false;"><i class="rex-icon ${icon}"></i></a>`
                         : `<i class="rex-icon ${icon}"></i>`}
                 </td>
                 <td style="max-width: 500px; vertical-align: middle;">${nameContent}</td>
@@ -99,6 +103,10 @@ function renderFiles(files) {
                             ${(typeof rex !== 'undefined' && rex.nextcloudSharingEnabled) ? `
                             <button class="btn btn-default btn-xs" title="Share-Link erstellen" onclick="event.stopPropagation(); openShareModal('${file.path}', '${decodedName}')">
                                 <i class="rex-icon fa-share-alt"></i>
+                            </button>` : ''}
+                            ${(typeof rex !== 'undefined' && rex.nextcloudDeleteEnabled) ? `
+                            <button class="btn btn-danger btn-xs" title="Datei löschen" onclick="event.stopPropagation(); deleteRemoteFile('${file.path}', '${decodedName}')">
+                                <i class="rex-icon fa-trash"></i>
                             </button>` : ''}
                         </div>
                     ` : `
@@ -132,9 +140,10 @@ function renderFiles(files) {
 }
 
 function updateToolbar() {
-    // Aktualisiere den Import-Button im Header basierend auf der Auswahl
+    // Aktualisiere die Aktions-Buttons im Header basierend auf der Auswahl
     const headerButtons = $('.panel-heading .btn-group');
     const importButton = headerButtons.find('#btnImportSelected');
+    const deleteButton = headerButtons.find('#btnDeleteSelected');
     
     if (selectedFiles.size > 0) {
         if (!importButton.length) {
@@ -147,8 +156,22 @@ function updateToolbar() {
         } else {
             importButton.html(`<i class="rex-icon fa-upload"></i> ${selectedFiles.size} importieren`);
         }
+
+        if (typeof rex !== 'undefined' && rex.nextcloudDeleteEnabled) {
+            if (!deleteButton.length) {
+                headerButtons.prepend(`
+                    <button class="btn btn-danger btn-xs" id="btnDeleteSelected" style="margin-right: 10px;">
+                        <i class="rex-icon fa-trash"></i> ${selectedFiles.size} löschen
+                    </button>
+                `);
+                $('#btnDeleteSelected').on('click', deleteSelectedFiles);
+            } else {
+                deleteButton.html(`<i class="rex-icon fa-trash"></i> ${selectedFiles.size} löschen`);
+            }
+        }
     } else {
         importButton.remove();
+        deleteButton.remove();
     }
 }
 
@@ -250,6 +273,101 @@ async function importSelectedFiles() {
     }, 500);
 }
 
+async function deleteSelectedFiles() {
+    if (typeof rex === 'undefined' || !rex.nextcloudDeleteEnabled) {
+        alert('Keine Berechtigung zum Löschen von Nextcloud-Dateien.');
+        return;
+    }
+
+    const files = Array.from(selectedFiles);
+    if (files.length === 0) {
+        alert('Bitte zuerst Dateien auswählen.');
+        return;
+    }
+
+    const confirmed = window.confirm(`${files.length} ausgewählte Dateien wirklich löschen?`);
+    if (!confirmed) {
+        return;
+    }
+
+    const modal = $(`
+        <div class="modal fade" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">Lösche Dateien...</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                        <div id="delete-status" class="text-center" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+
+    modal.modal({backdrop: 'static', keyboard: false});
+
+    let deleted = 0;
+    const failed = [];
+
+    for (let i = 0; i < files.length; i++) {
+        const path = files[i];
+        const fileName = decodeURIComponent(path.split('/').pop() || path);
+
+        modal.find('#delete-status').text(`Lösche "${fileName}" (${i + 1} von ${files.length})`);
+
+        try {
+            const params = {
+                page: 'nextcloud/main',
+                'rex-api-call': 'nextcloud',
+                action: 'delete',
+                path: path,
+            };
+
+            const response = await fetch('index.php?' + $.param(params));
+            const data = await response.json();
+
+            if (data.success) {
+                deleted++;
+            } else {
+                failed.push({
+                    name: fileName,
+                    error: data.error || 'Unbekannter Fehler'
+                });
+            }
+        } catch (error) {
+            failed.push({
+                name: fileName,
+                error: error.message
+            });
+        }
+
+        const progress = Math.round(((i + 1) / files.length) * 100);
+        modal.find('.progress-bar')
+            .css('width', progress + '%')
+            .text(progress + '%');
+    }
+
+    modal.modal('hide');
+
+    if (failed.length > 0) {
+        let message = `Löschen abgeschlossen:\n\n`;
+        message += `${deleted} Dateien erfolgreich gelöscht\n`;
+        message += `${failed.length} Fehler:\n\n`;
+        failed.forEach(({name, error}) => {
+            message += `- ${name}: ${error}\n`;
+        });
+        alert(message);
+    } else {
+        alert(`Alle ${deleted} Dateien wurden erfolgreich gelöscht.`);
+    }
+
+    loadFiles(currentPath);
+}
+
 function getFileIcon(type) {
     switch(type) {
         case 'folder': return 'fa-folder-o';
@@ -317,6 +435,48 @@ function previewPdf(path, name) {
     window.open(previewUrl, '_blank');
 }
 
+function previewVideo(path, name) {
+    const params = {
+        page: 'nextcloud/main',
+        'rex-api-call': 'nextcloud',
+        action: 'video_preview',
+        path: path
+    };
+
+    const previewUrl = 'index.php?' + $.param(params);
+
+    const modal = $(`
+        <div class="modal fade" tabindex="-1" role="dialog">
+            <div class="modal-dialog modal-lg" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                        <h4 class="modal-title">${name}</h4>
+                    </div>
+                    <div class="modal-body text-center">
+                        <video controls preload="metadata" style="max-width: 100%; max-height: 70vh;" src="${previewUrl}">
+                            Ihr Browser unterstützt die Video-Vorschau nicht.
+                        </video>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Schließen</button>
+                        <button type="button" class="btn btn-primary" onclick="importFile('${path}')">
+                            <i class="rex-icon fa-upload"></i> Importieren
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+
+    modal.modal('show');
+    modal.on('hidden.bs.modal', function() {
+        modal.remove();
+    });
+}
+
 function importFile(path) {
     const categoryId = $('#rex-mediapool-category').val();
     const fileName = decodeURIComponent(path.split('/').pop());
@@ -350,6 +510,155 @@ function importFile(path) {
         .catch(error => {
             alert(`Fehler beim Import von "${fileName}": ${error.message}`);
         });
+}
+
+function deleteRemoteFile(path, name) {
+    if (typeof rex === 'undefined' || !rex.nextcloudDeleteEnabled) {
+        alert('Keine Berechtigung zum Löschen von Nextcloud-Dateien.');
+        return;
+    }
+
+    const confirmed = window.confirm(`Datei wirklich löschen?\n\n${name}`);
+    if (!confirmed) {
+        return;
+    }
+
+    const params = {
+        page: 'nextcloud/main',
+        'rex-api-call': 'nextcloud',
+        action: 'delete',
+        path: path,
+    };
+
+    fetch('index.php?' + $.param(params))
+        .then(response => response.json())
+        .then(data => {
+            if (!data.success) {
+                throw new Error(data.error || 'Löschen fehlgeschlagen');
+            }
+
+            alert('Datei wurde in Nextcloud gelöscht.');
+            loadFiles(currentPath);
+        })
+        .catch(error => {
+            alert(`Fehler beim Löschen: ${error.message}`);
+        });
+}
+
+function getMedialistFilenames() {
+    const hiddenInput = document.getElementById('REX_MEDIALIST_nextcloud-mediapool-upload-list');
+    if (!hiddenInput) {
+        return [];
+    }
+
+    const rawValue = hiddenInput.value.trim();
+    if (!rawValue) {
+        return [];
+    }
+
+    const unique = new Set();
+    rawValue.split(',').forEach((entry) => {
+        const filename = entry.trim();
+        if (filename) {
+            unique.add(filename);
+        }
+    });
+
+    return Array.from(unique);
+}
+
+async function uploadMediapoolFilesToCurrentFolder() {
+    if (typeof rex === 'undefined' || !rex.nextcloudUploadFromMediapoolEnabled) {
+        alert('Keine Berechtigung für diesen Upload.');
+        return;
+    }
+
+    const mediaFilenames = getMedialistFilenames();
+    if (mediaFilenames.length === 0) {
+        alert('Bitte zuerst Dateien aus dem Medienpool auswählen.');
+        return;
+    }
+
+    const progressModal = $(`
+        <div class="modal fade" tabindex="-1" role="dialog">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h4 class="modal-title">Lade Dateien nach Nextcloud hoch...</h4>
+                    </div>
+                    <div class="modal-body">
+                        <div class="progress">
+                            <div class="progress-bar" role="progressbar" style="width: 0%;">0%</div>
+                        </div>
+                        <div id="upload-status" class="text-center" style="margin-top: 10px;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `);
+    progressModal.modal({backdrop: 'static', keyboard: false});
+
+    const button = $('#btnUploadMedialistToNextcloud');
+    const originalLabel = button.html();
+    button.prop('disabled', true).html('<i class="rex-icon fa-spinner fa-spin"></i> Upload...');
+
+    let uploaded = 0;
+    const failed = [];
+
+    for (let i = 0; i < mediaFilenames.length; i++) {
+        const mediaFilename = mediaFilenames[i];
+        progressModal.find('#upload-status').text(`Lade "${mediaFilename}" (${i + 1} von ${mediaFilenames.length})`);
+
+        try {
+            const params = {
+                page: 'nextcloud/main',
+                'rex-api-call': 'nextcloud',
+                action: 'upload_mediapool',
+                media_filename: mediaFilename,
+                target_path: currentPath
+            };
+
+            const response = await fetch('index.php?' + $.param(params));
+            const data = await response.json();
+
+            if (data.success) {
+                uploaded++;
+            } else {
+                failed.push({
+                    name: mediaFilename,
+                    error: data.error || 'Unbekannter Fehler'
+                });
+            }
+        } catch (error) {
+            failed.push({
+                name: mediaFilename,
+                error: error.message
+            });
+        }
+
+        const progress = Math.round(((i + 1) / mediaFilenames.length) * 100);
+        progressModal.find('.progress-bar')
+            .css('width', progress + '%')
+            .text(progress + '%');
+    }
+
+    progressModal.modal('hide');
+    $('#nextcloud-mediapool-upload-modal').modal('hide');
+    button.prop('disabled', false).html(originalLabel);
+
+    if (failed.length > 0) {
+        let message = `Upload abgeschlossen:\n\n`;
+        message += `${uploaded} Dateien erfolgreich hochgeladen\n`;
+        message += `${failed.length} Fehler:\n\n`;
+        failed.forEach(({name, error}) => {
+            message += `- ${name}: ${error}\n`;
+        });
+        alert(message);
+    } else {
+        alert(`Alle ${uploaded} Dateien wurden erfolgreich nach Nextcloud hochgeladen.`);
+    }
+
+    loadFiles(currentPath);
 }
 
 // -------------------------------------------------------------------------
@@ -510,6 +819,14 @@ $(document).on('rex:ready', function() {
     
     $('#btnHome').on('click', function() {
         loadFiles('/');
+    });
+
+    $('#btnOpenMediapoolUploadModal').on('click', function() {
+        $('#nextcloud-mediapool-upload-modal').modal('show');
+    });
+
+    $('#btnUploadMedialistToNextcloud').on('click', function() {
+        uploadMediapoolFilesToCurrentFolder();
     });
     
     loadFiles('/');

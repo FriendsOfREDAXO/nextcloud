@@ -1,5 +1,5 @@
 package: nextcloud
-version: '1.4.0'
+version: '1.6.0'
 author: FriendsOfREDAXO
 supportpage: hhttps://github.com/FriendsOfREDAXO/nextcloud
 
@@ -10,10 +10,16 @@ requires:
 
 page:
     title: NextCloud
-    perm: admin[]
+    perm: nextcloud[]
     icon: rex-icon fa-cloud
     subpages:
-        main: 
+        main:
             title: 'translate:files'
         config:
             title: 'translate:settings'
+            perm: admin[]
+
+permissions:
+    nextcloud[]: translate:nextcloud_perm_access
+    nextcloud[upload_mediapool]: translate:nextcloud_perm_upload_mediapool
+    nextcloud[delete]: translate:nextcloud_perm_delete

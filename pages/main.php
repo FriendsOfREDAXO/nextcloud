@@ -17,6 +17,58 @@ $cats_sel->setId('rex-mediapool-category');
 $cats_sel->setSize(1);
 $cats_sel->setAttribute('class', 'form-control');
 
+$user = \rex::getUser();
+$canUploadFromMediapool = $user !== null && ($user->isAdmin() || $user->hasPerm('nextcloud[upload_mediapool]'));
+
+$mediapoolUploadPanel = '';
+if ($canUploadFromMediapool) {
+    $medialistWidget = \rex_var_medialist::getWidget('nextcloud-mediapool-upload-list', 'nextcloud_mediapool_files', '', []);
+
+    $mediapoolUploadPanel = '
+        <div class="col-sm-8">
+            <div class="panel panel-default">
+                <header class="panel-heading">
+                    <div class="panel-title">' . \rex_i18n::msg('nextcloud_upload_from_mediapool_title') . '</div>
+                </header>
+                <div class="panel-body">
+                    <div class="row" style="display:flex; align-items:center; gap:10px;">
+                        <div class="col-sm-8">
+                            <p class="help-block" style="margin:0;">' . \rex_i18n::msg('nextcloud_upload_modal_notice') . '</p>
+                        </div>
+                        <div class="col-sm-4">
+                            <button class="btn btn-primary btn-block" id="btnOpenMediapoolUploadModal" type="button">
+                                <i class="rex-icon fa-list"></i> ' . \rex_i18n::msg('nextcloud_open_upload_modal') . '
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal fade" id="nextcloud-mediapool-upload-modal" tabindex="-1" role="dialog" aria-hidden="true">
+                <div class="modal-dialog modal-lg" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                            <h4 class="modal-title">' . \rex_i18n::msg('nextcloud_upload_modal_title') . '</h4>
+                        </div>
+                        <div class="modal-body">
+                            ' . $medialistWidget . '
+                            <p class="help-block" style="margin-top:10px; margin-bottom:0;">' . \rex_i18n::msg('nextcloud_upload_multiple_from_mediapool_notice') . '</p>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-default" data-dismiss="modal">' . \rex_i18n::msg('close') . '</button>
+                            <button type="button" class="btn btn-primary" id="btnUploadMedialistToNextcloud">
+                                <i class="rex-icon fa-cloud-upload"></i> ' . \rex_i18n::msg('nextcloud_upload_multiple_to_current_folder') . '
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>';
+}
+
 // Hauptcontainer
 $content = '
 <div class="nextcloud-container">
@@ -31,6 +83,7 @@ $content = '
                 </div>
             </div>
         </div>
+        ' . $mediapoolUploadPanel . '
     </div>
     
     <div class="panel panel-default">

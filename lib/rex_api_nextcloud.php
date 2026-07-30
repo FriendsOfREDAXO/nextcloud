@@ -20,6 +20,12 @@ class rex_api_nextcloud extends rex_api_function
         $path       = rex_request('path', 'string', '/');
         $categoryId = rex_request('category_id', 'integer', 0);
 
+        $user = rex::getUser();
+        if (!$user || (!$user->isAdmin() && !$user->hasPerm('nextcloud[]'))) {
+            rex_response::sendJson(['success' => false, 'error' => 'Keine Berechtigung für das Nextcloud-Addon.']);
+            exit;
+        }
+
         try {
             $api = new NextCloud();
 
@@ -51,6 +57,24 @@ class rex_api_nextcloud extends rex_api_function
                     echo $content;
                     exit;
 
+                case 'video_preview':
+                    $content   = $api->getImageContent($path);
+                    $extension = strtolower(pathinfo(basename($path), PATHINFO_EXTENSION));
+                    $mimeTypes = [
+                        'mp4'  => 'video/mp4',
+                        'm4v'  => 'video/mp4',
+                        'webm' => 'video/webm',
+                        'ogv'  => 'video/ogg',
+                        'ogg'  => 'video/ogg',
+                        'mov'  => 'video/quicktime',
+                        'avi'  => 'video/x-msvideo',
+                        'mkv'  => 'video/x-matroska',
+                    ];
+                    header('Content-Type: ' . ($mimeTypes[$extension] ?? 'application/octet-stream'));
+                    header('Content-Disposition: inline; filename="' . basename($path) . '"');
+                    echo $content;
+                    exit;
+
                 case 'import':
                     $result    = $api->importToMediapool($path, $categoryId);
                     $tagsField = rex_config::get('nextcloud', 'tags_field', '');
@@ -77,6 +101,51 @@ class rex_api_nextcloud extends rex_api_function
                 case 'get_tags':
                     $meta = $api->getFileTags($path);
                     rex_response::sendJson(['success' => true, 'data' => $meta]);
+                    exit;
+
+                case 'upload_mediapool':
+                    if (!$user->isAdmin() && !$user->hasPerm('nextcloud[upload_mediapool]')) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Keine Berechtigung für den Upload aus dem Medienpool.']);
+                        exit;
+                    }
+
+                    $mediaFilename = rex_request('media_filename', 'string', '');
+                    $targetPath = rex_request('target_path', 'string', '/');
+
+                    if ($mediaFilename === '') {
+                        rex_response::sendJson(['success' => false, 'error' => 'Es wurde keine Medienpool-Datei ausgewählt.']);
+                        exit;
+                    }
+
+                    $media = rex_media::get($mediaFilename);
+                    if (!$media) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Die angegebene Medienpool-Datei existiert nicht.']);
+                        exit;
+                    }
+
+                    $mediaPerm = $user->getComplexPerm('media');
+                    if (!$mediaPerm->hasCategoryPerm((int) $media->getCategoryId())) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Keine Berechtigung für diese Medienpool-Kategorie.']);
+                        exit;
+                    }
+
+                    $result = $api->uploadFromMediapool($mediaFilename, $targetPath);
+                    rex_response::sendJson(['success' => true, 'data' => $result]);
+                    exit;
+
+                case 'delete':
+                    if (!$user->isAdmin() && !$user->hasPerm('nextcloud[delete]')) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Keine Berechtigung zum Löschen von Nextcloud-Dateien.']);
+                        exit;
+                    }
+
+                    if ($path === '' || $path === '/') {
+                        rex_response::sendJson(['success' => false, 'error' => 'Ungültiger Dateipfad.']);
+                        exit;
+                    }
+
+                    $result = $api->deleteFile($path);
+                    rex_response::sendJson(['success' => true, 'data' => $result]);
                     exit;
 
                 default:

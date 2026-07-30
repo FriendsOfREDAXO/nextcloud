@@ -1,5 +1,37 @@
 # Changelog
 
+## [1.6.0] – 2026-07-30
+
+### Neu
+
+- Mehrfach-Löschen aus der Dateiliste über Checkbox-Auswahl und Sammelaktion in der Toolbar ergänzt.
+- Löschaktion pro Datei bleibt verfügbar und wird durch das Recht `nextcloud[delete]` gesteuert.
+
+### Verbessert
+
+- Upload-Workflow im Backend auf Modal mit einer einzigen Medienliste fokussiert (kein zusätzliches Einzeldatei-Feld mehr).
+
+### Behoben
+
+- 403-Fehler beim Löschen durch konsistentere Pfadbehandlung zwischen Dateiliste und WebDAV-Aufruf entschärft.
+- Klarere Fehlermeldung bei verweigertem Löschen in Nextcloud (z. B. fehlende Nextcloud-Rechte oder Dateisperren).
+
+## [1.5.0] – 2026-07-30
+
+### Neu
+
+- Dateien aus dem REDAXO-Medienpool können direkt in den aktuell geöffneten Nextcloud-Ordner hochgeladen werden.
+- Mehrfach-Upload aus dem REDAXO-Medienpool über eine Medienliste ergänzt.
+- Neues Recht `nextcloud[upload_mediapool]` steuert den Upload aus dem Medienpool gezielt pro Benutzerrolle.
+- Video-Dateien können in der Dateiliste direkt per Vorschau-Modal abgespielt werden.
+- Nutzer mit dem Recht `nextcloud[delete]` können Dateien direkt aus der Nextcloud-Dateiliste löschen.
+- Upload-UI für Medienpool-Dateien auf ein schlankes Modal umgestellt und auf eine einzige Medienliste reduziert.
+
+### Sicherheit
+
+- Neuer API-Endpoint für den Medienpool-Upload prüft Addon-Recht, Upload-Recht und Medienkategorie-Rechte des Benutzers.
+- Zielpfad-Prüfung schützt vor Pfad-Traversal (`.` und `..`) beim Upload-Ziel.
+
 ## [1.4.0] – 2026-04-17
 
 ### Neu: Share-Links
