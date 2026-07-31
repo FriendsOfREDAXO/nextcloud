@@ -1,6 +1,18 @@
 # Changelog
 
-## [1.6.0] – 2026-07-31
+## [1.6.1] – 2026-07-31
+
+### Verbessert
+
+- Rekursive Datei- und Ordnersuche auf die serverseitige WebDAV-Suche von Nextcloud umgestellt. Dadurch benötigt eine Suche nur noch einen Request und bleibt auch bei großen Verzeichnisstrukturen reaktionsfähig.
+
+### Behoben
+
+- Dauerhaften Zustand „Suche läuft…“ bei umfangreichen Verzeichnisstrukturen behoben.
+- Beim Öffnen eines Ordners aus den Suchergebnissen wird die Suche nun zurückgesetzt und der tatsächliche Ordnerinhalt angezeigt.
+- Home-Symbol im Navigationspfad verlinkt und doppelte Schrägstriche in der Pfadanzeige entfernt.
+
+## [1.6.0] – 2026-07-30
 
 ### Neu
 
@@ -10,11 +22,6 @@
 - Mehrfach-Download ausgewählter Dateien als ZIP über die Checkbox-Auswahl ergänzt.
 - Ordner-Download als ZIP direkt aus der Dateiliste ergänzt.
 - Neues Recht `nextcloud[download]` steuert Download-Aktionen.
-- Dateien aus dem REDAXO-Medienpool können direkt in den aktuell geöffneten Nextcloud-Ordner hochgeladen werden.
-- Mehrfach-Upload aus dem REDAXO-Medienpool über eine Medienliste ergänzt.
-- Neues Recht `nextcloud[upload_mediapool]` steuert den Upload aus dem Medienpool gezielt pro Benutzerrolle.
-- Video-Dateien können in der Dateiliste direkt per Vorschau-Modal abgespielt werden.
-- Upload-UI für Medienpool-Dateien auf ein schlankes Modal umgestellt und auf eine einzige Medienliste reduziert.
 
 ### Verbessert
 
@@ -25,6 +32,17 @@
 
 - 403-Fehler beim Löschen durch konsistentere Pfadbehandlung zwischen Dateiliste und WebDAV-Aufruf entschärft.
 - Klarere Fehlermeldung bei verweigertem Löschen in Nextcloud (z. B. fehlende Nextcloud-Rechte oder Dateisperren).
+
+## [1.5.0] – 2026-07-30
+
+### Neu
+
+- Dateien aus dem REDAXO-Medienpool können direkt in den aktuell geöffneten Nextcloud-Ordner hochgeladen werden.
+- Mehrfach-Upload aus dem REDAXO-Medienpool über eine Medienliste ergänzt.
+- Neues Recht `nextcloud[upload_mediapool]` steuert den Upload aus dem Medienpool gezielt pro Benutzerrolle.
+- Video-Dateien können in der Dateiliste direkt per Vorschau-Modal abgespielt werden.
+- Nutzer mit dem Recht `nextcloud[delete]` können Dateien direkt aus der Nextcloud-Dateiliste löschen.
+- Upload-UI für Medienpool-Dateien auf ein schlankes Modal umgestellt und auf eine einzige Medienliste reduziert.
 
 ### Sicherheit
 
