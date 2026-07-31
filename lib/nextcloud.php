@@ -150,6 +150,8 @@ class NextCloud {
                              <d:getetag />
                          </d:prop>
                      </d:propfind>';
+        } elseif ($method === 'SEARCH') {
+            $headers[] = 'Content-Type: text/xml; charset=utf-8';
         }
 
         $options = [
@@ -336,6 +338,136 @@ class NextCloud {
         }
     }
 
+    /**
+     * Sucht serverseitig nach Datei- und Ordnernamen unterhalb eines Startpfads.
+     *
+     * @return array<int, array{name:string,path:string,type:string,size:string,modified:string}>
+     */
+    public function searchFilesRecursive(string $basePath = '/', string $query = '', int $maxResults = 500): array
+    {
+        $normalizedQuery = trim($query);
+        if ($normalizedQuery === '') {
+            return $this->listFiles($basePath);
+        }
+
+        $this->assertSafeDisplayPath($basePath);
+
+        $normalizedBasePath = '/' . trim(rawurldecode($basePath), '/');
+        if ($normalizedBasePath === '//') {
+            $normalizedBasePath = '/';
+        }
+
+        $scopePath = '/files/' . $this->username;
+        if ($this->rootFolder !== '/') {
+            $scopePath .= $this->rootFolder;
+        }
+        if ($normalizedBasePath !== '/') {
+            $scopePath .= $normalizedBasePath;
+        }
+
+        $escapeXml = static fn (string $value): string => htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        $searchBody = '<?xml version="1.0" encoding="UTF-8"?>
+<d:searchrequest xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+    <d:basicsearch>
+        <d:select>
+            <d:prop>
+                <d:displayname/>
+                <d:getcontentlength/>
+                <d:getlastmodified/>
+                <d:resourcetype/>
+            </d:prop>
+        </d:select>
+        <d:from>
+            <d:scope>
+                <d:href>' . $escapeXml($scopePath) . '</d:href>
+                <d:depth>infinity</d:depth>
+            </d:scope>
+        </d:from>
+        <d:where>
+            <d:like>
+                <d:prop><d:displayname/></d:prop>
+                <d:literal>%' . $escapeXml($normalizedQuery) . '%</d:literal>
+            </d:like>
+        </d:where>
+        <d:orderby/>
+        <d:limit><d:nresults>' . max(1, $maxResults) . '</d:nresults></d:limit>
+    </d:basicsearch>
+</d:searchrequest>';
+
+        $response = $this->request('/remote.php/dav/', 'SEARCH', $searchBody);
+
+        return $this->parseSearchResponse($response);
+    }
+
+    /**
+     * @return array<int, array{name:string,path:string,type:string,size:string,modified:string}>
+     */
+    private function parseSearchResponse(string $response): array
+    {
+        $response = (string) preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $response);
+        $previousLibXmlUseErrors = libxml_use_internal_errors(true);
+
+        try {
+            $xml = new \SimpleXMLElement($response);
+        } catch (\Exception) {
+            throw new \rex_exception('Failed to parse server search response');
+        } finally {
+            libxml_use_internal_errors($previousLibXmlUseErrors);
+        }
+
+        $xml->registerXPathNamespace('d', 'DAV:');
+        $files = [];
+        $responseNodes = $xml->xpath('//d:response');
+        if (!is_array($responseNodes)) {
+            return [];
+        }
+
+        foreach ($responseNodes as $item) {
+            $hrefNodes = $item->xpath('d:href');
+            $propNodes = $item->xpath('d:propstat/d:prop');
+            if (!is_array($hrefNodes) || $hrefNodes === [] || !is_array($propNodes) || $propNodes === []) {
+                continue;
+            }
+
+            $href = rawurldecode((string) $hrefNodes[0]);
+            $pattern = '#^/remote\.php/dav/files/' . preg_quote($this->username, '#') . '#';
+            $relativePath = (string) preg_replace($pattern, '', $href);
+            $displayPath = $relativePath;
+            if ($this->rootFolder !== '/') {
+                $displayPath = (string) preg_replace('#^' . preg_quote($this->rootFolder, '#') . '#', '', $relativePath);
+            }
+            $displayPath = '/' . trim((string) preg_replace('#/+#', '/', $displayPath), '/');
+            if ($displayPath === '//') {
+                $displayPath = '/';
+            }
+
+            $props = $propNodes[0];
+            $nameNodes = $props->xpath('d:displayname');
+            $displayName = is_array($nameNodes) && $nameNodes !== [] ? (string) $nameNodes[0] : basename($displayPath);
+            if ($displayName === '') {
+                continue;
+            }
+
+            $collectionNodes = $props->xpath('d:resourcetype/d:collection');
+            $isDirectory = is_array($collectionNodes) && $collectionNodes !== [];
+            $sizeNodes = $props->xpath('d:getcontentlength');
+            $modifiedNodes = $props->xpath('d:getlastmodified');
+            $modifiedTimestamp = is_array($modifiedNodes) && $modifiedNodes !== []
+                ? strtotime((string) $modifiedNodes[0])
+                : false;
+
+            $files[] = [
+                'name' => $displayName,
+                'path' => $displayPath,
+                'type' => $isDirectory ? 'folder' : $this->getFileType($displayName),
+                'size' => !$isDirectory && is_array($sizeNodes) && $sizeNodes !== [] ? $this->formatSize((int) $sizeNodes[0]) : '',
+                'modified' => false !== $modifiedTimestamp ? date('Y-m-d H:i', $modifiedTimestamp) : '',
+            ];
+        }
+
+        return $files;
+    }
+
     public function importToMediapool($path, $categoryId = 0) {
         try {
             \rex_logger::factory()->log('debug', 'NextCloud Import', [
@@ -475,6 +607,127 @@ class NextCloud {
         return [
             'path' => $normalizedPath,
         ];
+    }
+
+    /**
+     * Erstellt ein ZIP-Archiv aus einer Liste von Nextcloud-Pfaden.
+     *
+     * @param list<string> $displayPaths
+     * @return array{zip_path: string, filename: string}
+     * @throws \rex_exception
+     */
+    public function createZipFromPaths(array $displayPaths, string $baseFilename = 'nextcloud-download'): array
+    {
+        if (!class_exists(\ZipArchive::class)) {
+            throw new \rex_exception('ZipArchive ist nicht verfügbar.');
+        }
+
+        $zipPath = \rex_path::cache('nextcloud_download_' . date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '.zip');
+        $zip = new \ZipArchive();
+        if (true !== $zip->open($zipPath, \ZipArchive::CREATE | \ZipArchive::OVERWRITE)) {
+            throw new \rex_exception('ZIP-Datei konnte nicht erstellt werden.');
+        }
+
+        $addedFiles = 0;
+
+        foreach ($displayPaths as $displayPath) {
+            $displayPath = trim((string) $displayPath);
+            if ($displayPath === '' || $displayPath === '/') {
+                continue;
+            }
+
+            $this->assertSafeDisplayPath($displayPath);
+
+            $normalizedPath = '/' . trim(rawurldecode($displayPath), '/');
+            if ($normalizedPath === '/' || $normalizedPath === '//') {
+                continue;
+            }
+
+            if ($this->isFolderPath($normalizedPath)) {
+                $entryPrefix = trim((string) basename($normalizedPath), '/');
+                if ($entryPrefix === '') {
+                    $entryPrefix = 'ordner';
+                }
+                $zip->addEmptyDir($entryPrefix);
+                $addedFiles++;
+                $addedFiles += $this->addFolderToZip($zip, $normalizedPath, $entryPrefix);
+            } else {
+                $content = $this->getImageContent($normalizedPath);
+                $entryName = ltrim($normalizedPath, '/');
+                if ($entryName === '') {
+                    $entryName = (string) basename($normalizedPath);
+                }
+                $zip->addFromString($entryName, $content);
+                $addedFiles++;
+            }
+        }
+
+        $zip->close();
+
+        if ($addedFiles === 0) {
+            \rex_file::delete($zipPath);
+            throw new \rex_exception('Es wurden keine Dateien für das ZIP-Archiv gefunden.');
+        }
+
+        return [
+            'zip_path' => $zipPath,
+            'filename' => $baseFilename . '_' . date('Ymd_His') . '.zip',
+        ];
+    }
+
+    /**
+     * @throws \rex_exception
+     */
+    private function addFolderToZip(\ZipArchive $zip, string $folderPath, string $entryPrefix): int
+    {
+        $addedFiles = 0;
+        $children = $this->listFiles($folderPath);
+
+        foreach ($children as $child) {
+            $childPath = (string) ($child['path'] ?? '');
+            $childName = (string) ($child['name'] ?? '');
+            $childType = (string) ($child['type'] ?? 'file');
+
+            if ($childPath === '' || $childName === '') {
+                continue;
+            }
+
+            if ($childType === 'folder') {
+                $childDir = trim($entryPrefix . '/' . $childName, '/');
+                $zip->addEmptyDir($childDir);
+                $addedFiles += $this->addFolderToZip($zip, $childPath, $childDir);
+                continue;
+            }
+
+            $content = $this->getImageContent($childPath);
+            $entryName = trim($entryPrefix . '/' . $childName, '/');
+            $zip->addFromString($entryName, $content);
+            $addedFiles++;
+        }
+
+        return $addedFiles;
+    }
+
+    private function isFolderPath(string $displayPath): bool
+    {
+        $parentPath = dirname($displayPath);
+        if ($parentPath === '.' || $parentPath === '\\') {
+            $parentPath = '/';
+        }
+        $parentPath = '/' . trim($parentPath, '/');
+        if ($parentPath === '//') {
+            $parentPath = '/';
+        }
+
+        $name = (string) basename($displayPath);
+        foreach ($this->listFiles($parentPath) as $entry) {
+            if ((string) ($entry['name'] ?? '') !== $name) {
+                continue;
+            }
+            return (string) ($entry['type'] ?? 'file') === 'folder';
+        }
+
+        return false;
     }
 
     /**

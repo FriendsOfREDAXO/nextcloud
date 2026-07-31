@@ -1,5 +1,9 @@
 let currentPath = '/';
 let selectedFiles = new Set();
+let currentFiles = [];
+let currentSearchTerm = '';
+let searchDebounceTimer = null;
+let searchRequestCounter = 0;
 
 function loadFiles(path = '/') {
     currentPath = path;
@@ -23,7 +27,12 @@ function loadFiles(path = '/') {
         .then(data => {
             if (data.success) {
                 updateBreadcrumb(path);
-                renderFiles(data.data);
+                currentFiles = Array.isArray(data.data) ? data.data : [];
+                if (currentSearchTerm.trim() !== '') {
+                    performRecursiveSearch(currentSearchTerm);
+                } else {
+                    renderFiles(currentFiles);
+                }
             } else {
                 throw new Error(data.error || 'Unknown error occurred');
             }
@@ -37,11 +46,32 @@ function loadFiles(path = '/') {
         });
 }
 
+    function openFolder(path) {
+        currentSearchTerm = '';
+        searchRequestCounter++;
+
+        if (searchDebounceTimer !== null) {
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = null;
+        }
+
+        const searchInput = document.getElementById('nextcloud-search-input');
+        if (searchInput) {
+            searchInput.value = '';
+        }
+        updateSearchCount(false, 0);
+        loadFiles(path);
+    }
+
 function renderFiles(files) {
     const fileList = document.getElementById('fileList');
     fileList.innerHTML = '';
+    const isSearchActive = currentSearchTerm.trim() !== '';
+    const visibleFiles = Array.isArray(files) ? files.slice() : [];
+
+    updateSearchCount(isSearchActive, visibleFiles.length);
     
-    if (currentPath !== '/') {
+    if (currentPath !== '/' && !isSearchActive) {
         const parentPath = currentPath.split('/').slice(0, -1).join('/') || '/';
         fileList.innerHTML += `
             <tr class="folder-row" style="cursor: pointer;" data-path="${parentPath}">
@@ -52,16 +82,30 @@ function renderFiles(files) {
             </tr>`;
     }
     
-    files.sort((a, b) => {
+    visibleFiles.sort((a, b) => {
         if (a.type === 'folder' && b.type !== 'folder') return -1;
         if (a.type !== 'folder' && b.type === 'folder') return 1;
         return decodeURIComponent(a.name).localeCompare(decodeURIComponent(b.name));
     });
-    
-    files.forEach(file => {
+
+    if (visibleFiles.length === 0) {
+        const noResultsText = (typeof rex !== 'undefined' && rex.nextcloudSearchNoResults)
+            ? rex.nextcloudSearchNoResults
+            : 'Keine Treffer gefunden.';
+        fileList.innerHTML += `
+            <tr>
+                <td colspan="6" class="text-muted text-center">${noResultsText}</td>
+            </tr>`;
+    }
+
+    visibleFiles.forEach(file => {
         const icon = getFileIcon(file.type);
         const rowClass = file.type === 'folder' ? 'folder-row' : '';
         const decodedName = decodeURIComponent(file.name);
+        const decodedPath = decodeURIComponent(file.path || '');
+        const locationHint = isSearchActive
+            ? `<div class="text-muted" style="font-size:11px; margin-top:2px; word-break: break-word;">${decodedPath}</div>`
+            : '';
         
         // Checkbox nur für Dateien, nicht für Ordner
         const checkbox = file.type !== 'folder' 
@@ -91,12 +135,16 @@ function renderFiles(files) {
                         ? `<a href="#" onclick="event.stopPropagation(); previewVideo('${file.path}', '${decodedName}'); return false;"><i class="rex-icon ${icon}"></i></a>`
                         : `<i class="rex-icon ${icon}"></i>`}
                 </td>
-                <td style="max-width: 500px; vertical-align: middle;">${nameContent}</td>
+                <td style="max-width: 500px; vertical-align: middle;">${nameContent}${locationHint}</td>
                 <td style="width: 100px; vertical-align: middle;">${file.size || ''}</td>
                 <td style="width: 150px; vertical-align: middle;">${file.modified || ''}</td>
-                <td style="width: 60px; vertical-align: middle;">
+                <td class="nextcloud-actions-cell" style="vertical-align: middle;">
                     ${file.type !== 'folder' ? `
-                        <div class="btn-group btn-group-xs">
+                        <div class="nextcloud-actions">
+                            ${(typeof rex !== 'undefined' && rex.nextcloudDownloadEnabled) ? `
+                            <button class="btn btn-default btn-xs" title="Herunterladen" onclick="event.stopPropagation(); downloadRemoteItem('${file.path}', '${file.type}')">
+                                <i class="rex-icon fa-download"></i>
+                            </button>` : ''}
                             <button class="btn btn-primary btn-xs" title="Importieren" onclick="event.stopPropagation(); importFile('${file.path}')">
                                 <i class="rex-icon fa-upload"></i>
                             </button>
@@ -110,9 +158,15 @@ function renderFiles(files) {
                             </button>` : ''}
                         </div>
                     ` : `
-                        <button class="btn btn-default btn-xs">
-                            <i class="rex-icon fa-chevron-right"></i>
-                        </button>
+                        <div class="nextcloud-actions">
+                            ${(typeof rex !== 'undefined' && rex.nextcloudDownloadEnabled) ? `
+                            <button class="btn btn-default btn-xs" title="Ordner als ZIP herunterladen" onclick="event.stopPropagation(); downloadRemoteItem('${file.path}', 'folder')">
+                                <i class="rex-icon fa-download"></i>
+                            </button>` : ''}
+                            <button class="btn btn-default btn-xs">
+                                <i class="rex-icon fa-chevron-right"></i>
+                            </button>
+                        </div>
                     `}
                 </td>
             </tr>`;
@@ -122,7 +176,7 @@ function renderFiles(files) {
     $('.folder-row').on('click', function() {
         const path = $(this).data('path');
         if (path) {
-            loadFiles(path);
+            openFolder(path);
         }
     });
 
@@ -139,11 +193,100 @@ function renderFiles(files) {
     });
 }
 
+function applyLiveSearch(term) {
+    currentSearchTerm = (term || '').trim();
+
+    if (searchDebounceTimer !== null) {
+        clearTimeout(searchDebounceTimer);
+        searchDebounceTimer = null;
+    }
+
+    if (currentSearchTerm === '') {
+        updateSearchCount(false, 0);
+        renderFiles(currentFiles);
+        return;
+    }
+
+    searchDebounceTimer = setTimeout(() => {
+        performRecursiveSearch(currentSearchTerm);
+    }, 250);
+}
+
+function performRecursiveSearch(term) {
+    const requestId = ++searchRequestCounter;
+    const fileList = document.getElementById('fileList');
+    updateSearchCount(true, 0, true);
+    if (fileList) {
+        fileList.innerHTML = '<tr><td colspan="6" class="text-center"><i class="rex-icon fa-spinner fa-spin"></i> Suche läuft...</td></tr>';
+    }
+
+    const params = {
+        page: 'nextcloud/main',
+        'rex-api-call': 'nextcloud',
+        action: 'search',
+        path: currentPath,
+        query: term
+    };
+
+    const url = 'index.php?' + $.param(params);
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (requestId !== searchRequestCounter) {
+                return;
+            }
+
+            if (data.success) {
+                selectedFiles.clear();
+                updateToolbar();
+                renderFiles(Array.isArray(data.data) ? data.data : []);
+                return;
+            }
+
+            throw new Error(data.error || 'Suche fehlgeschlagen');
+        })
+        .catch(error => {
+            if (requestId !== searchRequestCounter) {
+                return;
+            }
+
+            updateSearchCount(true, 0);
+
+            if (fileList) {
+                fileList.innerHTML = `<tr><td colspan="6" class="alert alert-danger">${error.message}</td></tr>`;
+            }
+        });
+}
+
+function updateSearchCount(isSearchActive, count, isLoading = false) {
+    const countNode = document.getElementById('nextcloud-search-count');
+    if (!countNode) {
+        return;
+    }
+
+    if (!isSearchActive) {
+        countNode.textContent = '';
+        return;
+    }
+
+    if (isLoading) {
+        countNode.textContent = 'Suche läuft...';
+        return;
+    }
+
+    const suffix = (typeof rex !== 'undefined' && rex.nextcloudSearchResultSuffix)
+        ? rex.nextcloudSearchResultSuffix
+        : 'Treffer';
+    countNode.textContent = `${count} ${suffix}`;
+}
+
 function updateToolbar() {
     // Aktualisiere die Aktions-Buttons im Header basierend auf der Auswahl
     const headerButtons = $('.panel-heading .btn-group');
     const importButton = headerButtons.find('#btnImportSelected');
     const deleteButton = headerButtons.find('#btnDeleteSelected');
+    const downloadButton = headerButtons.find('#btnDownloadSelected');
     
     if (selectedFiles.size > 0) {
         if (!importButton.length) {
@@ -169,9 +312,23 @@ function updateToolbar() {
                 deleteButton.html(`<i class="rex-icon fa-trash"></i> ${selectedFiles.size} löschen`);
             }
         }
+
+        if (typeof rex !== 'undefined' && rex.nextcloudDownloadEnabled) {
+            if (!downloadButton.length) {
+                headerButtons.prepend(`
+                    <button class="btn btn-default btn-xs" id="btnDownloadSelected" style="margin-right: 10px;">
+                        <i class="rex-icon fa-download"></i> ${selectedFiles.size} als ZIP
+                    </button>
+                `);
+                $('#btnDownloadSelected').on('click', downloadSelectedFilesAsZip);
+            } else {
+                downloadButton.html(`<i class="rex-icon fa-download"></i> ${selectedFiles.size} als ZIP`);
+            }
+        }
     } else {
         importButton.remove();
         deleteButton.remove();
+        downloadButton.remove();
     }
 }
 
@@ -366,6 +523,67 @@ async function deleteSelectedFiles() {
     }
 
     loadFiles(currentPath);
+}
+
+function downloadSelectedFilesAsZip() {
+    if (typeof rex === 'undefined' || !rex.nextcloudDownloadEnabled) {
+        alert('Keine Berechtigung zum Herunterladen von Nextcloud-Dateien.');
+        return;
+    }
+
+    const files = Array.from(selectedFiles);
+    if (files.length === 0) {
+        alert('Bitte zuerst Dateien auswählen.');
+        return;
+    }
+
+    const confirmed = window.confirm(`${files.length} ausgewählte Dateien als ZIP herunterladen?`);
+    if (!confirmed) {
+        return;
+    }
+
+    submitDownloadForm({
+        page: 'nextcloud/main',
+        'rex-api-call': 'nextcloud',
+        action: 'download_zip',
+        paths_json: JSON.stringify(files),
+    });
+}
+
+function downloadRemoteItem(path, itemType) {
+    if (typeof rex === 'undefined' || !rex.nextcloudDownloadEnabled) {
+        alert('Keine Berechtigung zum Herunterladen von Nextcloud-Dateien.');
+        return;
+    }
+
+    const params = {
+        page: 'nextcloud/main',
+        'rex-api-call': 'nextcloud',
+        action: 'download',
+        path: path,
+        item_type: itemType,
+    };
+
+    window.open('index.php?' + $.param(params), '_blank');
+}
+
+function submitDownloadForm(params) {
+    const form = document.createElement('form');
+    form.method = 'POST';
+    form.action = 'index.php';
+    form.target = '_blank';
+
+    Object.keys(params).forEach((key) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = key;
+        input.value = params[key];
+        form.appendChild(input);
+    });
+
+    document.body.appendChild(form);
+    form.submit();
+    document.body.removeChild(form);
 }
 
 function getFileIcon(type) {
@@ -794,20 +1012,17 @@ function openShareModal(path, name) {
 function updateBreadcrumb(path) {
     const parts = path.split('/').filter(Boolean);
     let currentBuildPath = '';
-    let breadcrumb = '<i class="rex-icon fa-home"></i> ';
-    
-    if (parts.length > 0) {
-        breadcrumb += `<a href="#" onclick="loadFiles('/'); return false;">/</a> `;
-        
-        parts.forEach((part, index) => {
-            currentBuildPath += '/' + part;
-            const isLast = index === parts.length - 1;
-            
-            breadcrumb += isLast 
-                ? `/ ${decodeURIComponent(part)} `
-                : `/ <a href="#" onclick="loadFiles('${currentBuildPath}'); return false;">${decodeURIComponent(part)}</a> `;
-        });
-    }
+    let breadcrumb = '<a href="#" onclick="openFolder(\'/\'); return false;" title="Startverzeichnis" aria-label="Startverzeichnis"><i class="rex-icon fa-home"></i></a>';
+
+    parts.forEach((part, index) => {
+        currentBuildPath += '/' + part;
+        const isLast = index === parts.length - 1;
+        const label = decodeURIComponent(part);
+
+        breadcrumb += isLast
+            ? ` <span aria-hidden="true">/</span> <span>${label}</span>`
+            : ` <span aria-hidden="true">/</span> <a href="#" onclick="openFolder('${currentBuildPath}'); return false;">${label}</a>`;
+    });
     
     document.getElementById('pathBreadcrumb').innerHTML = breadcrumb;
 }
@@ -818,7 +1033,7 @@ $(document).on('rex:ready', function() {
     });
     
     $('#btnHome').on('click', function() {
-        loadFiles('/');
+        openFolder('/');
     });
 
     $('#btnOpenMediapoolUploadModal').on('click', function() {
@@ -827,6 +1042,17 @@ $(document).on('rex:ready', function() {
 
     $('#btnUploadMedialistToNextcloud').on('click', function() {
         uploadMediapoolFilesToCurrentFolder();
+    });
+
+    $('#nextcloud-search-input').on('input', function() {
+        applyLiveSearch(this.value);
+    });
+
+    $('#nextcloud-search-clear').on('click', function() {
+        const searchInput = $('#nextcloud-search-input');
+        searchInput.val('');
+        applyLiveSearch('');
+        searchInput.trigger('focus');
     });
     
     loadFiles('/');

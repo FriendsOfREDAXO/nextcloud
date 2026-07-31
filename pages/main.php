@@ -102,6 +102,16 @@ $content = '
         </header>
         <div class="panel-body">
             <div id="pathBreadcrumb"></div>
+            <div class="nextcloud-search" style="margin: 12px 0;">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-addon"><i class="rex-icon fa-search"></i></span>
+                    <input type="text" id="nextcloud-search-input" class="form-control" placeholder="' . \rex_i18n::msg('nextcloud_search_placeholder') . '">
+                    <span class="input-group-btn">
+                        <button class="btn btn-default" type="button" id="nextcloud-search-clear">' . \rex_i18n::msg('nextcloud_search_clear') . '</button>
+                    </span>
+                </div>
+                <div id="nextcloud-search-count" class="text-muted" style="font-size: 12px; margin-top: 6px;"></div>
+            </div>
             <table class="table table-hover">
                 <thead>
                     <tr>
@@ -114,7 +124,7 @@ $content = '
                         <th>' . \rex_i18n::msg('nextcloud_filename') . '</th>
                         <th style="width: 150px">' . \rex_i18n::msg('nextcloud_filesize') . '</th>
                         <th style="width: 150px">' . \rex_i18n::msg('nextcloud_modified') . '</th>
-                        <th style="width: 100px">
+                        <th style="width: 190px">
                             <label class="sr-only">Aktionen</label>
                         </th>
                     </tr>
@@ -131,6 +141,20 @@ $content = '
 }
 .file-select {
     cursor: pointer;
+}
+.nextcloud-container .table {
+    table-layout: fixed;
+}
+.nextcloud-actions-cell {
+    width: 190px;
+    white-space: nowrap;
+    text-align: right;
+}
+.nextcloud-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: nowrap;
 }
 </style>';
 

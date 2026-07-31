@@ -27,9 +27,14 @@ nextcloud_upload_modal_title = Dateien aus dem Medienpool nach Nextcloud laden
 nextcloud_upload_modal_notice = Wählen Sie die Dateien über die Medienliste im Dialog aus und laden Sie sie gesammelt in den aktuell geöffneten Nextcloud-Ordner.
 nextcloud_upload_multiple_to_current_folder = Ausgewählte Dateien laden
 nextcloud_upload_multiple_from_mediapool_notice = Mehrere Medienpool-Dateien können über die Medienliste gesammelt und in einem Schritt hochgeladen werden.
+nextcloud_search_placeholder = Datei- oder Ordnername suchen...
+nextcloud_search_clear = Zurücksetzen
+nextcloud_search_no_results = Keine Treffer gefunden.
+nextcloud_search_results_suffix = Treffer
 nextcloud_perm_access = Zugriff auf Nextcloud
 nextcloud_perm_upload_mediapool = Medienpool-Dateien nach Nextcloud hochladen
 nextcloud_perm_delete = Dateien in Nextcloud löschen
+nextcloud_perm_download = Dateien aus Nextcloud herunterladen
 
 # Share-Links
 nextcloud_sharing_title = Share-Links

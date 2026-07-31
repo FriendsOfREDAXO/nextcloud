@@ -35,6 +35,16 @@ class rex_api_nextcloud extends rex_api_function
                     rex_response::sendJson(['success' => true, 'data' => $files]);
                     exit;
 
+                case 'search':
+                    $query = rex_request('query', 'string', '');
+                    if (trim($query) === '') {
+                        $files = $api->listFiles($path);
+                    } else {
+                        $files = $api->searchFilesRecursive($path, $query);
+                    }
+                    rex_response::sendJson(['success' => true, 'data' => $files]);
+                    exit;
+
                 case 'preview':
                     $content   = $api->getImageContent($path);
                     $extension = strtolower(pathinfo(basename($path), PATHINFO_EXTENSION));
@@ -148,6 +158,48 @@ class rex_api_nextcloud extends rex_api_function
                     rex_response::sendJson(['success' => true, 'data' => $result]);
                     exit;
 
+                case 'download':
+                    if (!$user->isAdmin() && !$user->hasPerm('nextcloud[download]')) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Keine Berechtigung zum Herunterladen von Nextcloud-Dateien.']);
+                        exit;
+                    }
+
+                    if ($path === '' || $path === '/') {
+                        rex_response::sendJson(['success' => false, 'error' => 'Ungültiger Dateipfad.']);
+                        exit;
+                    }
+
+                    $itemType = rex_request('item_type', 'string', 'file');
+                    if ($itemType === 'folder') {
+                        $zipResult = $api->createZipFromPaths([$path], 'nextcloud-ordner');
+                        $this->sendLocalFileDownload($zipResult['zip_path'], $zipResult['filename'], 'application/zip');
+                    }
+
+                    $content = $api->getImageContent($path);
+                    $filename = (string) basename(rawurldecode($path));
+                    $this->sendContentDownload($content, $filename, $this->detectMimeTypeFromFilename($filename));
+
+                case 'download_zip':
+                    if (!$user->isAdmin() && !$user->hasPerm('nextcloud[download]')) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Keine Berechtigung zum Herunterladen von Nextcloud-Dateien.']);
+                        exit;
+                    }
+
+                    $pathsJson = rex_request('paths_json', 'string', '');
+                    if ($pathsJson === '') {
+                        rex_response::sendJson(['success' => false, 'error' => 'Keine Pfade für den ZIP-Download übergeben.']);
+                        exit;
+                    }
+
+                    $paths = json_decode($pathsJson, true);
+                    if (!is_array($paths) || count($paths) === 0) {
+                        rex_response::sendJson(['success' => false, 'error' => 'Ungültige Pfadliste für den ZIP-Download.']);
+                        exit;
+                    }
+
+                    $zipResult = $api->createZipFromPaths($paths, 'nextcloud-auswahl');
+                    $this->sendLocalFileDownload($zipResult['zip_path'], $zipResult['filename'], 'application/zip');
+
                 default:
                     rex_response::sendJson(['success' => false, 'error' => 'Invalid action']);
                     exit;
@@ -173,5 +225,66 @@ class rex_api_nextcloud extends rex_api_function
     protected function requiresCsrfProtection(): bool
     {
         return false;
+    }
+
+    private function sendContentDownload(string $content, string $filename, string $contentType): void
+    {
+        $safeName = $this->sanitizeDownloadFilename($filename);
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: attachment; filename="' . $safeName . '"');
+        header('Content-Length: ' . strlen($content));
+        echo $content;
+        exit;
+    }
+
+    private function sendLocalFileDownload(string $filePath, string $downloadFilename, string $contentType): void
+    {
+        if (!is_file($filePath)) {
+            rex_response::sendJson(['success' => false, 'error' => 'Download-Datei wurde nicht gefunden.']);
+            exit;
+        }
+
+        $safeName = $this->sanitizeDownloadFilename($downloadFilename);
+        header('Content-Type: ' . $contentType);
+        header('Content-Disposition: attachment; filename="' . $safeName . '"');
+        header('Content-Length: ' . (string) filesize($filePath));
+        readfile($filePath);
+        rex_file::delete($filePath);
+        exit;
+    }
+
+    private function detectMimeTypeFromFilename(string $filename): string
+    {
+        $ext = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+        $mimeTypes = [
+            'jpg' => 'image/jpeg',
+            'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'pdf' => 'application/pdf',
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+            'mov' => 'video/quicktime',
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'zip' => 'application/zip',
+            'txt' => 'text/plain',
+            'csv' => 'text/csv',
+            'json' => 'application/json',
+        ];
+
+        return $mimeTypes[$ext] ?? 'application/octet-stream';
+    }
+
+    private function sanitizeDownloadFilename(string $filename): string
+    {
+        $filename = trim($filename);
+        if ($filename === '') {
+            return 'download.bin';
+        }
+
+        return preg_replace('/[^A-Za-z0-9._-]/', '_', $filename) ?: 'download.bin';
     }
 }

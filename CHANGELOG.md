@@ -1,15 +1,20 @@
 # Changelog
 
-## [1.6.0] – 2026-07-30
+## [1.6.0] – 2026-07-31
 
 ### Neu
 
 - Mehrfach-Löschen aus der Dateiliste über Checkbox-Auswahl und Sammelaktion in der Toolbar ergänzt.
 - Löschaktion pro Datei bleibt verfügbar und wird durch das Recht `nextcloud[delete]` gesteuert.
+- Einzel-Download für Dateien direkt aus der Nextcloud-Dateiliste ergänzt.
+- Mehrfach-Download ausgewählter Dateien als ZIP über die Checkbox-Auswahl ergänzt.
+- Ordner-Download als ZIP direkt aus der Dateiliste ergänzt.
+- Neues Recht `nextcloud[download]` steuert Download-Aktionen.
 
 ### Verbessert
 
 - Upload-Workflow im Backend auf Modal mit einer einzigen Medienliste fokussiert (kein zusätzliches Einzeldatei-Feld mehr).
+- Rekursive Live-Suche für Datei- und Ordnernamen ergänzt (inklusive Unterordnern ab aktuellem Pfad).
 
 ### Behoben
 
