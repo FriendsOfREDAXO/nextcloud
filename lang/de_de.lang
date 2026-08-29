@@ -35,6 +35,8 @@ nextcloud_perm_access = Zugriff auf Nextcloud
 nextcloud_perm_upload_mediapool = Medienpool-Dateien nach Nextcloud hochladen
 nextcloud_perm_delete = Dateien in Nextcloud löschen
 nextcloud_perm_download = Dateien aus Nextcloud herunterladen
+nextcloud_perm_mediaplace_browse = In MediaPlace browsen & importieren
+nextcloud_mediaplace_provider_label = Nextcloud
 
 # Share-Links
 nextcloud_sharing_title = Share-Links

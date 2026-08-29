@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.7.0] – 2026-08-29
+
+### Neu
+
+- Nextcloud lässt sich jetzt direkt aus dem `mediaplace`-Addon heraus browsen, durchsuchen und importieren – klinkt sich dort als eigener Baum in die Sidebar ein (kein Sync, reines Import-Werkzeug: einmal importiert ist es eine ganz normale lokale Mediendatei). Neue Klasse `MediaplaceProvider` implementiert MediaPlace's `StorageProviderInterface`, registriert über den Erweiterungspunkt `MEDIAPLACE_STORAGE_PROVIDERS`. Neues, dediziertes Rollenrecht `nextcloud[mediaplace_browse]` – getrennt vom bestehenden, breiteren `nextcloud[]` (das zusätzlich Zugriff auf die eigenständige Nextcloud-Verwaltungsseite inkl. Upload/Löschen/Download gibt), damit sich "Browsen & Importieren via MediaPlace" gezielt einzeln vergeben lässt.
+- `listFiles()`/`searchFilesRecursive()` liefern jetzt zusätzlich die rohe Dateigröße in Bytes, den MIME-Typ und die Nextcloud-interne `fileid` pro Eintrag (bestehende Felder unverändert, rein additiv – bestehende Aufrufer bleiben kompatibel).
+- Neue Methode `getPreviewContent()`: ruft Nextclouds eigene Vorschau-/Thumbnail-API ab (statt immer das volle Original zu laden), genutzt für die Grid-Vorschaubilder im MediaPlace-Baum.
+
 ## [1.6.1] – 2026-07-31
 
 ### Verbessert

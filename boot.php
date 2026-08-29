@@ -6,6 +6,29 @@ if (\rex_addon::get('cronjob')->isAvailable()) {
     \rex_cronjob_manager::registerType(\rex_cronjob_redaxo_backup::class);
 }
 
+// MediaPlace-Cloud-Provider-Integration (siehe lib/MediaplaceProvider.php):
+// klinkt sich als eigener Baum in die MediaPlace-Sidebar ein (Browsen,
+// Suchen, Import in den lokalen Medienpool -- kein Sync). Eigenes,
+// dediziertes Recht statt des breiteren nextcloud[] (das zusaetzlich
+// Upload/Loeschen/Download auf der eigenstaendigen Nextcloud-Seite
+// freischaltet) -- ein User kann so gezielt nur "Browsen & Importieren via
+// MediaPlace" bekommen. Unconditional registrierbar (wie bei mediaplace's
+// eigenen Erweiterungspunkten): wird ohnehin nur von MediaPlace's eigenem,
+// backend-gated Code gefeuert.
+if (\rex_addon::get('mediaplace')->isAvailable()) {
+    \rex_extension::register('MEDIAPLACE_STORAGE_PROVIDERS', static function (\rex_extension_point $ep) {
+        $providers = $ep->getSubject();
+        $providers['nextcloud'] = [
+            'label' => \rex_i18n::msg('nextcloud_mediaplace_provider_label'),
+            'icon' => 'fa-solid fa-cloud',
+            'perm' => 'nextcloud[mediaplace_browse]',
+            'class' => MediaplaceProvider::class,
+        ];
+
+        return $providers;
+    });
+}
+
 // Nur im Backend ausführen
 if (\rex::isBackend() && \rex::getUser()) {
 

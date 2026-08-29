@@ -209,15 +209,30 @@ class NextCloud {
             \rex_logger::factory()->log('debug', 'NextCloud ListFiles Start', [
                 'original_path' => $path
             ]);
-            
+
             // URL für die PROPFIND-Anfrage erstellen
             $url = $this->buildWebDavUrl($path);
-            
+
             \rex_logger::factory()->log('debug', 'NextCloud ListFiles URL', [
                 'webdav_url' => $url
             ]);
-            
-            $response = $this->request($url, 'PROPFIND');
+
+            // oc:fileid zusaetzlich zu den bisherigen DAV-Props anfordern (statt
+            // der generischen request()-PROPFIND-Variante) -- wird fuer
+            // Thumbnail-Abruf ueber Nextclouds Preview-API gebraucht (siehe
+            // getPreviewContent()), gleiches oc:-Namespace-Muster wie getFileTags().
+            $propfindBody = '<?xml version="1.0" encoding="utf-8" ?>
+                     <d:propfind xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
+                         <d:prop>
+                             <d:getlastmodified />
+                             <d:getcontentlength />
+                             <d:getcontenttype />
+                             <d:resourcetype />
+                             <d:getetag />
+                             <oc:fileid />
+                         </d:prop>
+                     </d:propfind>';
+            $response = $this->requestPropfindCustom($url, $propfindBody, 1);
             
             // Entferne ungültige XML-Zeichen
             $response = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $response);
@@ -244,7 +259,8 @@ class NextCloud {
             }
             
             $xml->registerXPathNamespace('d', 'DAV:');
-            
+            $xml->registerXPathNamespace('oc', 'http://owncloud.org/ns');
+
             // Sammle alle Dateien und Ordner
             $files = [];
             foreach ($xml->xpath('//d:response') as $response) {
@@ -286,14 +302,28 @@ class NextCloud {
                 $props = $response->xpath('d:propstat/d:prop')[0];
                 $isDirectory = !empty($props->xpath('d:resourcetype/d:collection'));
                 
-                $size = '';
+                $sizeBytes = 0;
                 if (!$isDirectory && !empty($props->xpath('d:getcontentlength'))) {
-                    $size = $this->formatSize((int)$props->xpath('d:getcontentlength')[0]);
+                    $sizeBytes = (int) $props->xpath('d:getcontentlength')[0];
                 }
-                
+                $size = $sizeBytes > 0 ? $this->formatSize($sizeBytes) : '';
+
                 $lastMod = '';
                 if (!empty($props->xpath('d:getlastmodified'))) {
                     $lastMod = date('Y-m-d H:i', strtotime((string)$props->xpath('d:getlastmodified')[0]));
+                }
+
+                // Fuer die MediaPlace-Cloud-Provider-Integration (Thumbnails
+                // ueber Nextclouds Preview-API, siehe getPreviewContent()).
+                $fileId = null;
+                $fileIdNodes = $props->xpath('oc:fileid');
+                if (!empty($fileIdNodes)) {
+                    $fileId = (string) $fileIdNodes[0];
+                }
+                $mimeType = null;
+                $mimeNodes = $props->xpath('d:getcontenttype');
+                if (!empty($mimeNodes)) {
+                    $mimeType = (string) $mimeNodes[0];
                 }
 
                 \rex_logger::factory()->log('debug', 'NextCloud ListFiles Processed Entry', [
@@ -303,12 +333,15 @@ class NextCloud {
                     'size' => $size,
                     'modified' => $lastMod
                 ]);
-                
+
                 $files[] = [
                     'name' => $displayname,
                     'path' => $displayPath,
                     'type' => $isDirectory ? 'folder' : $this->getFileType($displayname),
                     'size' => $size,
+                    'size_bytes' => $sizeBytes,
+                    'fileid' => $fileId,
+                    'mimetype' => $mimeType,
                     'modified' => $lastMod
                 ];
             }
@@ -339,9 +372,61 @@ class NextCloud {
     }
 
     /**
+     * Nextclouds eigene Vorschau-/Thumbnail-API (nicht das volle Original wie
+     * getImageContent()) -- genutzt fuer die MediaPlace-Cloud-Provider-
+     * Integration (siehe MediaplaceProvider::getThumbnail()), damit Grid-
+     * Kacheln nicht bei jedem Rendern das komplette Originalbild laden
+     * muessen. Braucht die Nextcloud-interne fileid (siehe 'fileid'-Feld in
+     * listFiles()/searchFilesRecursive()), nicht den WebDAV-Pfad. Liefert
+     * null statt einer Exception, wenn Nextcloud fuer diesen Dateityp keine
+     * Vorschau erzeugen kann (z.B. reine Dokumente/Videos je nach Server-
+     * Konfiguration) -- der Aufrufer faellt dann auf das Datei-Icon zurueck,
+     * gleiches etabliertes Fallback-Muster wie ueberall sonst in MediaPlace.
+     *
+     * @return array{content: string, contentType: string}|null
+     */
+    public function getPreviewContent(string $fileId, int $width = 300, int $height = 300): ?array
+    {
+        if ('' === $fileId) {
+            return null;
+        }
+
+        $url = $this->baseUrl . '/index.php/core/preview?fileId=' . rawurlencode($fileId)
+            . '&x=' . max(1, $width) . '&y=' . max(1, $height) . '&a=1&mode=cover';
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => $this->username . ':' . $this->password,
+            CURLOPT_SSL_VERIFYPEER => (bool) \rex_config::get('nextcloud', 'ssl_verify', true),
+            CURLOPT_SSL_VERIFYHOST => \rex_config::get('nextcloud', 'ssl_verify', true) ? 2 : 0,
+            CURLOPT_HEADER => false,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 15,
+        ]);
+
+        $content = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $contentType = curl_getinfo($ch, CURLINFO_CONTENT_TYPE);
+        $curlError = curl_errno($ch);
+        curl_close($ch);
+
+        if ($curlError || $httpCode < 200 || $httpCode >= 300 || !is_string($content) || '' === $content) {
+            return null;
+        }
+
+        return [
+            'content' => $content,
+            'contentType' => is_string($contentType) && '' !== $contentType ? $contentType : 'image/png',
+        ];
+    }
+
+    /**
      * Sucht serverseitig nach Datei- und Ordnernamen unterhalb eines Startpfads.
      *
-     * @return array<int, array{name:string,path:string,type:string,size:string,modified:string}>
+     * @return array<int, array{name:string,path:string,type:string,size:string,size_bytes:int,fileid:?string,mimetype:?string,modified:string}>
      */
     public function searchFilesRecursive(string $basePath = '/', string $query = '', int $maxResults = 500): array
     {
@@ -373,8 +458,10 @@ class NextCloud {
             <d:prop>
                 <d:displayname/>
                 <d:getcontentlength/>
+                <d:getcontenttype/>
                 <d:getlastmodified/>
                 <d:resourcetype/>
+                <oc:fileid/>
             </d:prop>
         </d:select>
         <d:from>
@@ -400,7 +487,7 @@ class NextCloud {
     }
 
     /**
-     * @return array<int, array{name:string,path:string,type:string,size:string,modified:string}>
+     * @return array<int, array{name:string,path:string,type:string,size:string,size_bytes:int,fileid:?string,mimetype:?string,modified:string}>
      */
     private function parseSearchResponse(string $response): array
     {
@@ -416,6 +503,7 @@ class NextCloud {
         }
 
         $xml->registerXPathNamespace('d', 'DAV:');
+        $xml->registerXPathNamespace('oc', 'http://owncloud.org/ns');
         $files = [];
         $responseNodes = $xml->xpath('//d:response');
         if (!is_array($responseNodes)) {
@@ -456,11 +544,22 @@ class NextCloud {
                 ? strtotime((string) $modifiedNodes[0])
                 : false;
 
+            $sizeBytes = !$isDirectory && is_array($sizeNodes) && $sizeNodes !== [] ? (int) $sizeNodes[0] : 0;
+
+            $mimeNodes = $props->xpath('d:getcontenttype');
+            $mimeType = is_array($mimeNodes) && $mimeNodes !== [] ? (string) $mimeNodes[0] : null;
+
+            $fileIdNodes = $props->xpath('oc:fileid');
+            $fileId = is_array($fileIdNodes) && $fileIdNodes !== [] ? (string) $fileIdNodes[0] : null;
+
             $files[] = [
                 'name' => $displayName,
                 'path' => $displayPath,
                 'type' => $isDirectory ? 'folder' : $this->getFileType($displayName),
-                'size' => !$isDirectory && is_array($sizeNodes) && $sizeNodes !== [] ? $this->formatSize((int) $sizeNodes[0]) : '',
+                'size' => $sizeBytes > 0 ? $this->formatSize($sizeBytes) : '',
+                'size_bytes' => $sizeBytes,
+                'fileid' => $fileId,
+                'mimetype' => $mimeType,
                 'modified' => false !== $modifiedTimestamp ? date('Y-m-d H:i', $modifiedTimestamp) : '',
             ];
         }

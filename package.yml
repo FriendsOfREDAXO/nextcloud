@@ -1,5 +1,5 @@
 package: nextcloud
-version: '1.6.2'
+version: '1.7.0'
 author: FriendsOfREDAXO
 supportpage: hhttps://github.com/FriendsOfREDAXO/nextcloud
 
@@ -24,3 +24,4 @@ permissions:
     nextcloud[upload_mediapool]: translate:nextcloud_perm_upload_mediapool
     nextcloud[delete]: translate:nextcloud_perm_delete
     nextcloud[download]: translate:nextcloud_perm_download
+    nextcloud[mediaplace_browse]: translate:nextcloud_perm_mediaplace_browse
