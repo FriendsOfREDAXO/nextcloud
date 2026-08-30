@@ -1,6 +1,19 @@
 <?php
 namespace FriendsOfRedaxo\NextCloud;
 
+// Feingranulare Rechte -- package.yml's "permissions:"-Block (frueher hier
+// als einzige "Registrierung" gedacht) ist KEIN von REDAXO-Core verarbeiteter
+// YAML-Schluessel (rex_package/rex_addon kennen ihn nicht), reine tote YAML.
+// Nur rex_perm::register() traegt ein Recht tatsaechlich in die
+// Rollenverwaltung ein -- ohne das war z.B. "nextcloud[mediaplace_browse]"
+// zwar ueberall im Code per hasPerm() abgefragt, aber fuer keine Rolle
+// grantbar (Bugreport: Recht tauchte in der Rollenverwaltung gar nicht auf).
+// "nextcloud[]" braucht hier keinen eigenen Aufruf -- das wird bereits als
+// page-level perm (siehe package.yml) automatisch registriert.
+\rex_perm::register('nextcloud[upload_mediapool]', \rex_i18n::msg('nextcloud_perm_upload_mediapool'));
+\rex_perm::register('nextcloud[delete]', \rex_i18n::msg('nextcloud_perm_delete'));
+\rex_perm::register('nextcloud[download]', \rex_i18n::msg('nextcloud_perm_download'));
+\rex_perm::register('nextcloud[mediaplace_browse]', \rex_i18n::msg('nextcloud_perm_mediaplace_browse'));
 
 if (\rex_addon::get('cronjob')->isAvailable()) {
     \rex_cronjob_manager::registerType(\rex_cronjob_redaxo_backup::class);

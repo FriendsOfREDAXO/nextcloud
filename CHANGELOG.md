@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.1] – 2026-08-31
+
+### Behoben
+
+- Die feingranularen Rechte (`nextcloud[upload_mediapool]`, `nextcloud[delete]`, `nextcloud[download]`, `nextcloud[mediaplace_browse]`) tauchten in der Rollenverwaltung gar nicht erst auf und waren dadurch für keine Rolle vergebbar. Ursache: der `permissions:`-Block in `package.yml` (dachte, er würde diese Rechte registrieren) ist kein von REDAXO-Core verarbeiteter YAML-Schlüssel – reine, folgenlose YAML. Jetzt echt über `rex_perm::register()` in `boot.php` eingetragen (gleiches Muster, das auch `nextcloud[]` selbst über den page-level `perm:` bereits funktionierend nutzte). Betraf insbesondere `nextcloud[mediaplace_browse]` – ohne dieses Recht konnte eine Rolle mit allgemeinem Nextcloud-Zugriff (`nextcloud[]`) den Cloud-Speicher innerhalb von MediaPlace nicht nutzen, obwohl kein Fehler sichtbar war (das Recht ließ sich schlicht nirgends zuweisen).
+
 ## [1.7.0] – 2026-08-29
 
 ### Neu

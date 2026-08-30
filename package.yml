@@ -1,7 +1,7 @@
 package: nextcloud
-version: '1.7.0'
+version: '1.7.1'
 author: FriendsOfREDAXO
-supportpage: hhttps://github.com/FriendsOfREDAXO/nextcloud
+supportpage: https://github.com/FriendsOfREDAXO/nextcloud
 
 requires:
     redaxo: '^5.18.0'
@@ -19,9 +19,11 @@ page:
             title: 'translate:settings'
             perm: admin[]
 
-permissions:
-    nextcloud[]: translate:nextcloud_perm_access
-    nextcloud[upload_mediapool]: translate:nextcloud_perm_upload_mediapool
-    nextcloud[delete]: translate:nextcloud_perm_delete
-    nextcloud[download]: translate:nextcloud_perm_download
-    nextcloud[mediaplace_browse]: translate:nextcloud_perm_mediaplace_browse
+# Kein "permissions:"-Block hier -- REDAXO-Core kennt diesen YAML-Schluessel
+# nicht (reine tote YAML, siehe Bugreport), das taeuschte frueher eine
+# Registrierung nur vor. Feingranulare Rechte (nextcloud[upload_mediapool]/
+# [delete]/[download]/[mediaplace_browse]) werden jetzt echt in boot.php per
+# rex_perm::register() eingetragen, sonst tauchen sie in der
+# Rollenverwaltung gar nicht erst auf. nextcloud[] (Basis-Zugriff) braucht
+# das nicht -- das ist bereits der page-level "perm:" oben, wird von REDAXO
+# automatisch registriert.
