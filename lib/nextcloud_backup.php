@@ -1,15 +1,21 @@
 <?php
 /**
  * REDAXO Backup Cronjob
- * 
- * Erstellt Backups von Datenbank und Dateisystem und speichert sie in einer Nextcloud-Instanz über WebDAV.
- * 
- * Diese Datei gehört in: /var/www/html/redaxo/src/addons/cronjob/lib/types/redaxo_backup.php
- * 
- * Abhängigkeiten: 
- * - sabre/dav library (installierbar via Composer)
+ *
+ * Erstellt Backups von Datenbank und Dateisystem und speichert sie in einer
+ * Nextcloud-Instanz. Seit nextcloud 2.0.0 kein eigener WebDAV-Client mehr --
+ * Upload/Retention laufen ueber cloudconnects
+ * \FriendsOfRedaxo\CloudConnect\Nextcloud\NextcloudClient (siehe
+ * lib/nextcloud.php fuer denselben Umbau in der Browser-Feature-Klasse).
+ *
+ * Mehrkonten-faehig wie der Rest des Addons: REDAXO-Cronjobs unterstuetzen
+ * bereits mehrere Instanzen desselben Typs mit jeweils eigener Config --
+ * die Ziel-Nextcloud wird pro Cronjob-Instanz ueber ein Auswahlfeld
+ * (connection_id, siehe getParamFields()) aus den in cloudconnect
+ * konfigurierten Nextcloud-Accounts gewaehlt, nicht mehr global in
+ * rex_config gespeichert. Zwei Cronjob-Eintraege = Backup zu zwei
+ * verschiedenen Accounts, ohne Code-Duplizierung.
  */
-
 class rex_cronjob_redaxo_backup extends rex_cronjob
 {
     public function execute()
@@ -17,90 +23,100 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         $success = true;
         $message = [];
 
-        // Parameter abrufen
-        $nextcloud_url = $this->getParam('nextcloud_url');
-        $nextcloud_username = $this->getParam('nextcloud_username');
-        $nextcloud_password = $this->getParam('nextcloud_password');
-        $nextcloud_path = $this->getParam('nextcloud_path');
-        $max_backups = (int) $this->getParam('max_backups');
-        $backup_db = $this->getParam('backup_db') === '1';
-        $backup_files = $this->getParam('backup_files') === '1';
-        
-        // Prüfen ob mindestens eine Backup-Art ausgewählt wurde
-        if (!$backup_db && !$backup_files) {
+        $connectionId = (string) $this->getParam('connection_id');
+        $nextcloudPath = trim((string) $this->getParam('nextcloud_path'), '/');
+        $maxBackups = (int) $this->getParam('max_backups');
+        $backupDb = '1' === $this->getParam('backup_db');
+        $backupFiles = '1' === $this->getParam('backup_files');
+
+        if (!$backupDb && !$backupFiles) {
             return [false, rex_i18n::msg('nextcloud_backup_no_type_selected')];
         }
 
-        // Prüfen ob alle Nextcloud-Zugangsdaten angegeben wurden
-        if (empty($nextcloud_url) || empty($nextcloud_username) || empty($nextcloud_password)) {
-            return [false, rex_i18n::msg('nextcloud_config_missing')];
+        if (!function_exists('curl_init')) {
+            return [false, rex_i18n::msg('nextcloud_backup_curl_not_available')];
         }
 
-        // Basis-Verzeichnis für temporäre Backups
-        $backup_base_dir = rex_path::base('backup');
-        
-        // Stellen Sie sicher, dass das Backup-Verzeichnis existiert
-        if (!file_exists($backup_base_dir)) {
-            mkdir($backup_base_dir, 0755, true);
+        if ('' === $connectionId) {
+            return [false, rex_i18n::msg('nextcloud_backup_config_missing')];
         }
 
-        // Timestamp für die Benennung der Backups
+        $connection = \FriendsOfRedaxo\CloudConnect\ConnectionStore::get($connectionId);
+        if (null === $connection || 'nextcloud' !== ($connection['type'] ?? '') || !\FriendsOfRedaxo\CloudConnect\ConnectionStore::isComplete($connection)) {
+            return [false, rex_i18n::msg('nextcloud_backup_config_missing')];
+        }
+
+        try {
+            $client = new \FriendsOfRedaxo\CloudConnect\Nextcloud\NextcloudClient($connectionId);
+        } catch (Exception $e) {
+            return [false, rex_i18n::msg('nextcloud_backup_connection_error') . ': ' . $e->getMessage()];
+        }
+
+        // Basis-Verzeichnis fuer temporaere Backups
+        $backupBaseDir = rex_path::base('backup');
+        if (!file_exists($backupBaseDir)) {
+            mkdir($backupBaseDir, 0755, true);
+        }
+
         $timestamp = date('Y-m-d_H-i-s');
-        
-        // WebDAV-Client initialisieren
-        $webdav_client = $this->initWebDavClient($nextcloud_url, $nextcloud_username, $nextcloud_password);
-        
-        if ($webdav_client === false) {
-            return [false, rex_i18n::msg('nextcloud_backup_connection_error')];
+
+        $rootDir = '/' . $nextcloudPath;
+        $dbDir = '/' . $nextcloudPath . '/db';
+        $filesDir = '/' . $nextcloudPath . '/files';
+
+        // NextcloudClient bietet bewusst kein MKCOL (Datei-Upload aus der
+        // Browser-Seite zielt immer auf einen bereits existierenden,
+        // gerade durchsuchten Ordner) -- der Backup-Cronjob muss seine
+        // Zielstruktur beim allerersten Lauf aber selbst anlegen koennen.
+        // Statt dafuer einen zweiten vollstaendigen WebDAV-Client zu
+        // bauen, reicht ein minimaler PROPFIND/MKCOL-Helper direkt hier,
+        // der nur die dafuer noetigen rohen Verbindungsdaten aus
+        // cloudconnect liest (siehe ensureDirectoryExists() unten).
+        try {
+            $this->ensureDirectoryExists($connection['config'], $rootDir);
+            $this->ensureDirectoryExists($connection['config'], $dbDir);
+            $this->ensureDirectoryExists($connection['config'], $filesDir);
+        } catch (Exception $e) {
+            return [false, rex_i18n::msg('nextcloud_backup_dir_create_error', $nextcloudPath, $e->getMessage())];
         }
-        
-        // Stellen Sie sicher, dass die Zielverzeichnisse in der Nextcloud existieren
-        $this->ensureWebDavDirectoryExists($webdav_client, $nextcloud_path);
-        $this->ensureWebDavDirectoryExists($webdav_client, $nextcloud_path . '/db');
-        $this->ensureWebDavDirectoryExists($webdav_client, $nextcloud_path . '/files');
-        
+
+        $dbFile = null;
+        $filesFile = null;
+
         // Datenbank-Backup erstellen
-        if ($backup_db) {
+        if ($backupDb) {
             try {
-                $db_file = $backup_base_dir . '/redaxo_db_' . $timestamp . '.sql.gz';
-                
-                // Datenbank-Konfiguration auslesen
+                $dbFile = $backupBaseDir . '/redaxo_db_' . $timestamp . '.sql.gz';
+
                 $db = rex::getProperty('db');
-                $db_host = $db[1]['host'];
-                $db_name = $db[1]['name'];
-                $db_user = $db[1]['login'];
-                $db_password = $db[1]['password'];
-                
-                // mysqldump-Befehl ausführen
+                $dbHost = $db[1]['host'];
+                $dbName = $db[1]['name'];
+                $dbUser = $db[1]['login'];
+                $dbPassword = $db[1]['password'];
+
                 $command = sprintf(
                     'mysqldump -h %s -u %s -p%s %s | gzip > %s',
-                    escapeshellarg($db_host),
-                    escapeshellarg($db_user),
-                    escapeshellarg($db_password),
-                    escapeshellarg($db_name),
-                    escapeshellarg($db_file)
+                    escapeshellarg($dbHost),
+                    escapeshellarg($dbUser),
+                    escapeshellarg($dbPassword),
+                    escapeshellarg($dbName),
+                    escapeshellarg($dbFile),
                 );
-                
-                exec($command, $output, $return_var);
-                
-                if ($return_var !== 0) {
+
+                exec($command, $output, $returnVar);
+
+                if (0 !== $returnVar) {
                     $success = false;
                     $message[] = rex_i18n::msg('nextcloud_backup_db_error') . ': ' . implode("\n", $output);
                 } else {
-                    $message[] = rex_i18n::msg('nextcloud_backup_db_success') . ': ' . basename($db_file);
-                    
-                    // In Nextcloud hochladen
-                    $upload_result = $this->uploadToNextcloud(
-                        $webdav_client, 
-                        $db_file, 
-                        $nextcloud_path . '/db/' . basename($db_file)
-                    );
-                    
-                    if ($upload_result) {
+                    $message[] = rex_i18n::msg('nextcloud_backup_db_success') . ': ' . basename($dbFile);
+
+                    try {
+                        $client->putContent($dbDir . '/' . basename($dbFile), (string) \rex_file::get($dbFile));
                         $message[] = rex_i18n::msg('nextcloud_backup_db_upload_success');
-                    } else {
+                    } catch (Exception $e) {
                         $success = false;
-                        $message[] = rex_i18n::msg('nextcloud_backup_db_upload_error');
+                        $message[] = rex_i18n::msg('nextcloud_backup_db_upload_error') . ': ' . $e->getMessage();
                     }
                 }
             } catch (Exception $e) {
@@ -108,55 +124,47 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                 $message[] = rex_i18n::msg('nextcloud_backup_db_exception') . ': ' . $e->getMessage();
             }
         }
-        
+
         // Dateisystem-Backup erstellen
-        if ($backup_files) {
+        if ($backupFiles) {
             try {
-                $files_dir = rex_path::base();
-                $files_file = $backup_base_dir . '/redaxo_files_' . $timestamp . '.tar.gz';
-                
-                // Verzeichnisse, die wir nicht im Backup benötigen
-                $exclude_dirs = [
+                $filesDirLocal = rex_path::base();
+                $filesFile = $backupBaseDir . '/redaxo_files_' . $timestamp . '.tar.gz';
+
+                $excludeDirs = [
                     'backup',
                     'cache',
                     'redaxo/cache',
                     'redaxo/data/cache',
-                    'media/cache'
+                    'media/cache',
                 ];
-                
-                $exclude_params = '';
-                foreach ($exclude_dirs as $dir) {
-                    $exclude_params .= ' --exclude=' . escapeshellarg($dir);
+
+                $excludeParams = '';
+                foreach ($excludeDirs as $dir) {
+                    $excludeParams .= ' --exclude=' . escapeshellarg($dir);
                 }
-                
-                // tar-Befehl ausführen
+
                 $command = sprintf(
                     'tar -czf %s -C %s %s .',
-                    escapeshellarg($files_file),
-                    escapeshellarg($files_dir),
-                    $exclude_params
+                    escapeshellarg($filesFile),
+                    escapeshellarg($filesDirLocal),
+                    $excludeParams,
                 );
-                
-                exec($command, $output, $return_var);
-                
-                if ($return_var !== 0) {
+
+                exec($command, $output, $returnVar);
+
+                if (0 !== $returnVar) {
                     $success = false;
                     $message[] = rex_i18n::msg('nextcloud_backup_files_error') . ': ' . implode("\n", $output);
                 } else {
-                    $message[] = rex_i18n::msg('nextcloud_backup_files_success') . ': ' . basename($files_file);
-                    
-                    // In Nextcloud hochladen
-                    $upload_result = $this->uploadToNextcloud(
-                        $webdav_client, 
-                        $files_file, 
-                        $nextcloud_path . '/files/' . basename($files_file)
-                    );
-                    
-                    if ($upload_result) {
+                    $message[] = rex_i18n::msg('nextcloud_backup_files_success') . ': ' . basename($filesFile);
+
+                    try {
+                        $client->putContent($filesDir . '/' . basename($filesFile), (string) \rex_file::get($filesFile));
                         $message[] = rex_i18n::msg('nextcloud_backup_files_upload_success');
-                    } else {
+                    } catch (Exception $e) {
                         $success = false;
-                        $message[] = rex_i18n::msg('nextcloud_backup_files_upload_error');
+                        $message[] = rex_i18n::msg('nextcloud_backup_files_upload_error') . ': ' . $e->getMessage();
                     }
                 }
             } catch (Exception $e) {
@@ -164,282 +172,200 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
                 $message[] = rex_i18n::msg('nextcloud_backup_files_exception') . ': ' . $e->getMessage();
             }
         }
-        
+
         // Alte Backups bereinigen
-        if ($max_backups > 0) {
+        if ($maxBackups > 0) {
             try {
-                $this->cleanupOldBackups($webdav_client, $nextcloud_path . '/db', $max_backups);
-                $this->cleanupOldBackups($webdav_client, $nextcloud_path . '/files', $max_backups);
-                $message[] = rex_i18n::msg('nextcloud_backup_cleanup_success', $max_backups);
+                $this->cleanupOldBackups($client, $dbDir, $maxBackups);
+                $this->cleanupOldBackups($client, $filesDir, $maxBackups);
+                $message[] = rex_i18n::msg('nextcloud_backup_cleanup_success', $maxBackups);
             } catch (Exception $e) {
                 $success = false;
                 $message[] = rex_i18n::msg('nextcloud_backup_cleanup_error') . ': ' . $e->getMessage();
             }
         }
-        
-        // Lokale Backup-Dateien löschen
-        if ($backup_db) {
-            @unlink($db_file);
+
+        // Lokale Backup-Dateien loeschen
+        if ($backupDb && null !== $dbFile) {
+            @unlink($dbFile);
         }
-        if ($backup_files) {
-            @unlink($files_file);
+        if ($backupFiles && null !== $filesFile) {
+            @unlink($filesFile);
         }
-        
+
         return [$success, implode("\n", $message)];
     }
-    
+
     /**
-     * Initialisiert den WebDAV-Client für Nextcloud
+     * Entfernt alte Backups aus $directory und behaelt nur die $maxKeep
+     * neuesten -- Listing/Loeschen laufen ueber NextcloudClient (kein
+     * eigenes XML-Parsing mehr noetig, listFiles() liefert bereits
+     * strukturierte Eintraege inkl. 'modified').
      */
-    private function initWebDavClient($url, $username, $password)
+    private function cleanupOldBackups(\FriendsOfRedaxo\CloudConnect\Nextcloud\NextcloudClient $client, string $directory, int $maxKeep): void
     {
-        // Überprüfen, ob cURL verfügbar ist
-        if (!function_exists('curl_init')) {
-            throw new Exception(rex_i18n::msg('nextcloud_backup_curl_not_available'));
-        }
-        
-        // Stellen Sie sicher, dass die URL mit einem Slash endet
-        if (substr($url, -1) !== '/') {
-            $url .= '/';
-        }
-        
-        // Fügen Sie den remote.php/dav/files/ Pfad hinzu, wenn er nicht vorhanden ist
-        if (strpos($url, 'remote.php/dav/files/') === false) {
-            $url .= 'remote.php/dav/files/' . urlencode($username) . '/';
-        }
-        
-        // Initialisieren des cURL-Handle
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_USERPWD, $username . ':' . $password);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_HTTPAUTH, CURLAUTH_BASIC);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // Eventuell auf true setzen in Produktionsumgebungen
-        
-        // Überprüfen, ob die Verbindung hergestellt werden kann
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PROPFIND');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Depth: 0']);
-        
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if ($status === 0) {
-            throw new Exception(rex_i18n::msg('nextcloud_backup_connection_error') . ': ' . curl_error($ch));
-        }
-        
-        if ($status >= 400) {
-            throw new Exception(rex_i18n::msg('nextcloud_backup_auth_failed', $status));
-        }
-        
-        // cURL-Handle zurücksetzen
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, null);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, []);
-        
-        return ['curl' => $ch, 'base_url' => $url];
-    }
-    
-    /**
-     * Stellt sicher, dass ein Verzeichnis in Nextcloud existiert
-     */
-    private function ensureWebDavDirectoryExists($client, $path)
-    {
-        $ch = $client['curl'];
-        $url = $client['base_url'] . $this->normalizePath($path);
-        
-        // Prüfen ob das Verzeichnis existiert
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PROPFIND');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Depth: 0']);
-        
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        // Wenn das Verzeichnis nicht existiert, erstellen wir es
-        if ($status === 404) {
-            curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'MKCOL');
-            curl_setopt($ch, CURLOPT_HTTPHEADER, []);
-            
-            $response = curl_exec($ch);
-            $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            
-            if ($status >= 400) {
-                throw new Exception(rex_i18n::msg('nextcloud_backup_dir_create_error', $path, $status));
-            }
-        }
-        
-        // cURL-Handle zurücksetzen
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, null);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, []);
-    }
-    
-    /**
-     * Lädt eine Datei in die Nextcloud hoch
-     */
-    private function uploadToNextcloud($client, $local_file, $remote_path)
-    {
-        $ch = $client['curl'];
-        $url = $client['base_url'] . $this->normalizePath($remote_path);
-        
-        // Datei zum Hochladen öffnen
-        $file_handle = fopen($local_file, 'r');
-        
-        if ($file_handle === false) {
-            throw new Exception(rex_i18n::msg('nextcloud_backup_local_file_open_error', $local_file));
-        }
-        
-        // cURL für den Upload konfigurieren
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
-        curl_setopt($ch, CURLOPT_UPLOAD, true);
-        curl_setopt($ch, CURLOPT_INFILE, $file_handle);
-        curl_setopt($ch, CURLOPT_INFILESIZE, filesize($local_file));
-        
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        // Datei-Handle schließen
-        fclose($file_handle);
-        
-        // cURL-Handle zurücksetzen
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, null);
-        curl_setopt($ch, CURLOPT_UPLOAD, false);
-        curl_setopt($ch, CURLOPT_INFILE, null);
-        
-        return ($status >= 200 && $status < 300);
-    }
-    
-    /**
-     * Entfernt alte Backups und behält nur die neuesten
-     */
-    private function cleanupOldBackups($client, $directory, $max_keep)
-    {
-        $ch = $client['curl'];
-        $url = $client['base_url'] . $this->normalizePath($directory);
-        
-        // Verzeichnisinhalt auflisten
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PROPFIND');
-        curl_setopt($ch, CURLOPT_HTTPHEADER, ['Depth: 1']);
-        
-        $response = curl_exec($ch);
-        $status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        
-        if ($status >= 400) {
-            throw new Exception(rex_i18n::msg('nextcloud_backup_dir_list_error', $directory, $status));
-        }
-        
-        // XML-Antwort parsen
-        $xml = new SimpleXMLElement($response);
-        $xml->registerXPathNamespace('d', 'DAV:');
-        
-        // Alle Dateien finden
+        $entries = $client->listFiles($directory);
+
         $files = [];
-        foreach ($xml->xpath('//d:response') as $response) {
-            $href = (string)$response->xpath('./d:href')[0];
-            $filename = basename($href);
-            
-            // Nur Backup-Dateien berücksichtigen
-            if (preg_match('/^redaxo_(db|files)_.*\.(sql\.gz|tar\.gz)$/', $filename)) {
-                $lastmodified = strtotime((string)$response->xpath('.//d:getlastmodified')[0]);
-                $files[$href] = $lastmodified;
+        foreach ($entries as $entry) {
+            if ('file' !== ($entry['type'] ?? '')) {
+                continue;
             }
+            $name = (string) ($entry['name'] ?? '');
+            if (!preg_match('/^redaxo_(db|files)_.*\.(sql\.gz|tar\.gz)$/', $name)) {
+                continue;
+            }
+            $path = (string) ($entry['path'] ?? '');
+            if ('' === $path) {
+                continue;
+            }
+            $modified = (string) ($entry['modified'] ?? '');
+            $timestamp = '' !== $modified ? strtotime($modified) : 0;
+            $files[$path] = false !== $timestamp ? $timestamp : 0;
         }
-        
+
         // Nach Datum sortieren (neueste zuerst)
         arsort($files);
-        
-        // Die ältesten Dateien löschen
+
         $count = 0;
-        foreach ($files as $href => $lastmodified) {
-            $count++;
-            
-            if ($count > $max_keep) {
-                // Datei löschen
-                curl_setopt($ch, CURLOPT_URL, $client['base_url'] . substr($href, 1));
-                curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
-                curl_setopt($ch, CURLOPT_HTTPHEADER, []);
-                
-                $delete_response = curl_exec($ch);
-                $delete_status = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-                
-                if ($delete_status >= 400) {
-                    throw new Exception(rex_i18n::msg('nextcloud_backup_file_delete_error', basename($href), $delete_status));
-                }
+        foreach (array_keys($files) as $path) {
+            ++$count;
+            if ($count > $maxKeep) {
+                $client->deleteFile($path);
             }
         }
-        
-        // cURL-Handle zurücksetzen
-        curl_setopt($ch, CURLOPT_CUSTOMREQUEST, null);
-        curl_setopt($ch, CURLOPT_HTTPHEADER, []);
     }
-    
+
     /**
-     * Normalisiert einen Pfad für WebDAV
+     * Minimaler PROPFIND(Depth 0)/MKCOL-Helper, NUR fuer die
+     * Verzeichnis-Existenzpruefung/-Anlage beim Backup -- bewusst nicht
+     * Teil von NextcloudClient (siehe Kommentar in execute() oben). Baut
+     * dieselbe WebDAV-URL-Form wie NextcloudClient::buildWebDavUrl()
+     * (Root-Ordner-Praefix + je Segment rawurlencode), liest die
+     * Rohverbindungsdaten aber direkt aus der cloudconnect-Config, da
+     * NextcloudClient dafuer keine oeffentlichen Felder/Methoden anbietet.
+     *
+     * @param array<string, mixed> $config
      */
-    private function normalizePath($path)
+    private function ensureDirectoryExists(array $config, string $path): void
     {
-        // Entfernen Sie führende und nachfolgende Slashes
-        $path = trim($path, '/');
-        
-        // URL-kodieren Sie jeden Pfadbestandteil einzeln
-        $parts = explode('/', $path);
-        $encoded_parts = array_map('rawurlencode', $parts);
-        
-        return implode('/', $encoded_parts);
+        $baseUrl = rtrim((string) ($config['url'] ?? ''), '/');
+        $username = (string) ($config['username'] ?? '');
+        $password = (string) ($config['password'] ?? '');
+        $rootFolder = '/' . trim((string) ($config['root'] ?? ''), '/');
+        if ('/' === $rootFolder) {
+            $rootFolder = '';
+        }
+        $sslVerify = (bool) ($config['ssl_verify'] ?? true);
+
+        $normalizedPath = '/' === $path ? '' : '/' . trim($path, '/');
+        $fullPath = $rootFolder . $normalizedPath;
+        $segments = array_filter(explode('/', $fullPath), static fn (string $segment): bool => '' !== $segment);
+        $encodedPath = implode('/', array_map('rawurlencode', $segments));
+        $url = $baseUrl . '/remote.php/dav/files/' . rawurlencode($username) . ('' !== $encodedPath ? '/' . $encodedPath : '');
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => $username . ':' . $password,
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
+            CURLOPT_CUSTOMREQUEST => 'PROPFIND',
+            CURLOPT_HTTPHEADER => ['Depth: 0'],
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        curl_exec($ch);
+        $status = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $errno = curl_errno($ch);
+        $error = curl_error($ch);
+        curl_close($ch);
+
+        if (0 !== $errno) {
+            throw new Exception('Connection error: ' . $error);
+        }
+
+        // Existiert bereits (207 Multi-Status ist der Normalfall) -- nichts zu tun.
+        if (404 !== $status) {
+            return;
+        }
+
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_USERPWD => $username . ':' . $password,
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
+            CURLOPT_CUSTOMREQUEST => 'MKCOL',
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_TIMEOUT => 30,
+        ]);
+        curl_exec($ch);
+        $mkStatus = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $mkErrno = curl_errno($ch);
+        $mkError = curl_error($ch);
+        curl_close($ch);
+
+        if (0 !== $mkErrno) {
+            throw new Exception('Connection error: ' . $mkError);
+        }
+        if ($mkStatus >= 400) {
+            throw new Exception('MKCOL failed (HTTP ' . $mkStatus . ')');
+        }
     }
-    
+
     public function getTypeName()
     {
         return rex_i18n::msg('nextcloud_backup_type_name');
     }
-    
+
     public function getParamFields()
     {
+        $connections = [];
+        foreach (\FriendsOfRedaxo\CloudConnect\ConnectionStore::getByType('nextcloud') as $id => $connection) {
+            $label = (string) ($connection['label'] ?? $id);
+            if (!($connection['active'] ?? false)) {
+                $label .= ' (' . rex_i18n::msg('nextcloud_backup_connection_inactive') . ')';
+            }
+            $connections[$id] = $label;
+        }
+
         return [
             [
-                'label' => rex_i18n::msg('nextcloud_baseurl'),
-                'name' => 'nextcloud_url',
-                'type' => 'text',
-                'notice' => rex_i18n::msg('nextcloud_backup_url_notice')
-            ],
-            [
-                'label' => rex_i18n::msg('nextcloud_username'),
-                'name' => 'nextcloud_username',
-                'type' => 'text'
-            ],
-            [
-                'label' => rex_i18n::msg('nextcloud_password'),
-                'name' => 'nextcloud_password',
-                'type' => 'text',
-                'attributes' => ['type' => 'password'],
-                'notice' => rex_i18n::msg('nextcloud_password_notice')
+                'label' => rex_i18n::msg('nextcloud_backup_connection'),
+                'name' => 'connection_id',
+                'type' => 'select',
+                'options' => $connections,
+                'notice' => rex_i18n::msg('nextcloud_backup_connection_notice'),
             ],
             [
                 'label' => rex_i18n::msg('nextcloud_backup_path'),
                 'name' => 'nextcloud_path',
                 'type' => 'text',
-                'notice' => rex_i18n::msg('nextcloud_backup_path_notice')
+                'notice' => rex_i18n::msg('nextcloud_backup_path_notice'),
             ],
             [
                 'label' => rex_i18n::msg('nextcloud_backup_max_count'),
                 'name' => 'max_backups',
                 'type' => 'text',
-                'default' => '5'
+                'default' => '5',
             ],
             [
                 'label' => rex_i18n::msg('nextcloud_backup_database'),
                 'name' => 'backup_db',
                 'type' => 'select',
                 'options' => ['0' => rex_i18n::msg('no'), '1' => rex_i18n::msg('yes')],
-                'default' => '1'
+                'default' => '1',
             ],
             [
                 'label' => rex_i18n::msg('nextcloud_backup_files'),
                 'name' => 'backup_files',
                 'type' => 'select',
                 'options' => ['0' => rex_i18n::msg('no'), '1' => rex_i18n::msg('yes')],
-                'default' => '1'
-            ]
+                'default' => '1',
+            ],
         ];
     }
 }

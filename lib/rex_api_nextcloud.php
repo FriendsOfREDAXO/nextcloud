@@ -1,5 +1,6 @@
 <?php
 
+use FriendsOfRedaxo\CloudConnect\ConnectionStore;
 use FriendsOfRedaxo\NextCloud\NextCloud;
 
 /**
@@ -16,9 +17,10 @@ class rex_api_nextcloud extends rex_api_function
     {
         rex_response::cleanOutputBuffers();
 
-        $action     = rex_request('action', 'string');
-        $path       = rex_request('path', 'string', '/');
-        $categoryId = rex_request('category_id', 'integer', 0);
+        $action       = rex_request('action', 'string');
+        $path         = rex_request('path', 'string', '/');
+        $categoryId   = rex_request('category_id', 'integer', 0);
+        $connectionId = rex_request('connection_id', 'string', '');
 
         $user = rex::getUser();
         if (!$user || (!$user->isAdmin() && !$user->hasPerm('nextcloud[]'))) {
@@ -26,8 +28,19 @@ class rex_api_nextcloud extends rex_api_function
             exit;
         }
 
+        if ('' === $connectionId) {
+            rex_response::sendJson(['success' => false, 'error' => 'Kein Nextcloud-Account ausgewählt (connection_id fehlt).']);
+            exit;
+        }
+
+        $connection = ConnectionStore::get($connectionId);
+        if (null === $connection || 'nextcloud' !== ($connection['type'] ?? '')) {
+            rex_response::sendJson(['success' => false, 'error' => 'Unbekannter oder ungültiger Nextcloud-Account.']);
+            exit;
+        }
+
         try {
-            $api = new NextCloud();
+            $api = new NextCloud($connectionId);
 
             switch ($action) {
                 case 'list':

@@ -1,5 +1,6 @@
 <?php
 
+use FriendsOfRedaxo\CloudConnect\ConnectionStore;
 use FriendsOfRedaxo\NextCloud\NextCloud;
 
 /**
@@ -9,9 +10,17 @@ use FriendsOfRedaxo\NextCloud\NextCloud;
  *   REX_NEXTCLOUD_SHARE[path="/Dokumente/datei.pdf"]
  *   REX_NEXTCLOUD_SHARE[path="/Dokumente/datei.pdf" expiry="2027-12-31"]
  *   REX_NEXTCLOUD_SHARE[path="/Dokumente/datei.pdf" reset="1"]
+ *   REX_NEXTCLOUD_SHARE[path="/Dokumente/datei.pdf" connection="a1b2c3d4"]
  *
- * Der Share-Link wird nach der ersten Erzeugung gecacht (rex_config).
- * Mit reset="1" wird der Cache geleert und ein neuer Link erstellt.
+ * "connection": Id eines in cloudconnect konfigurierten Nextcloud-Accounts
+ * (siehe Einstellungsseite dort). Optional -- fehlt der Parameter, wird der
+ * erste aktive Nextcloud-Account verwendet (deckt den bisherigen
+ * Ein-Account-Fall ab, ohne bestehende Modul-Ausgaben anpassen zu müssen).
+ *
+ * Der Share-Link wird pro Account UND Pfad separat gecacht (rex_config) --
+ * derselbe Pfad kann in unterschiedlichen Accounts existieren und braucht
+ * dann auch unterschiedliche Cache-Einträge. Mit reset="1" wird der Cache
+ * geleert und ein neuer Link erstellt.
  *
  * Anwendungsbeispiel im Modul-Output:
  *   <a href="REX_NEXTCLOUD_SHARE[path="/docs/flyer.pdf"]">Flyer herunterladen</a>
@@ -28,11 +37,13 @@ class rex_var_nextcloud_share extends rex_var
 
         $expiry = $this->getArg('expiry', '', true);
         $reset  = $this->getArg('reset', '0', true);
+        $connection = $this->getArg('connection', '', true);
 
         return 'rex_var_nextcloud_share::getShareUrl('
             . self::quote($path) . ', '
             . self::quote($expiry) . ', '
-            . '(bool)' . self::quote($reset)
+            . '(bool)' . self::quote($reset) . ', '
+            . self::quote($connection)
             . ')';
     }
 
@@ -40,13 +51,14 @@ class rex_var_nextcloud_share extends rex_var
      * Gibt den Share-Link für einen Nextcloud-Pfad zurück.
      * Gecachte Links werden aus rex_config gelesen und nur bei Bedarf neu erstellt.
      *
-     * @param string $path      Pfad relativ zum konfigurierten Root-Ordner
-     * @param string $expiry    Ablaufdatum (YYYY-MM-DD), leer = kein Ablauf
-     * @param bool   $reset     true = vorhandenen Cache ignorieren, neuen Link erstellen
+     * @param string $path         Pfad relativ zum Root-Ordner des Accounts
+     * @param string $expiry       Ablaufdatum (YYYY-MM-DD), leer = kein Ablauf
+     * @param bool   $reset        true = vorhandenen Cache ignorieren, neuen Link erstellen
+     * @param string $connectionId Id einer cloudconnect-Nextcloud-Verbindung, leer = erste aktive
      *
      * @return string Share-URL oder leerer String bei Fehler
      */
-    public static function getShareUrl(string $path, string $expiry = '', bool $reset = false): string
+    public static function getShareUrl(string $path, string $expiry = '', bool $reset = false, string $connectionId = ''): string
     {
         if ('' === $path) {
             return '';
@@ -56,7 +68,16 @@ class rex_var_nextcloud_share extends rex_var
             return '';
         }
 
-        $cacheKey = 'share_cache_' . md5($path);
+        if ('' === $connectionId) {
+            $firstKey = array_key_first(ConnectionStore::getActiveByType('nextcloud'));
+            $connectionId = null !== $firstKey ? (string) $firstKey : '';
+        }
+        if ('' === $connectionId) {
+            \rex_logger::factory()->log('error', 'REX_NEXTCLOUD_SHARE: kein Nextcloud-Account konfiguriert (siehe cloudconnect)', ['path' => $path]);
+            return '';
+        }
+
+        $cacheKey = 'share_cache_' . $connectionId . '_' . md5($path);
 
         if (!$reset) {
             $cached = \rex_config::get('nextcloud', $cacheKey);
@@ -75,7 +96,7 @@ class rex_var_nextcloud_share extends rex_var
         }
 
         try {
-            $api    = new NextCloud();
+            $api    = new NextCloud($connectionId);
             $result = $api->createShareLink($path, '' !== $expiry ? $expiry : null);
 
             if (empty($result['url'])) {
@@ -92,6 +113,7 @@ class rex_var_nextcloud_share extends rex_var
         } catch (\Exception $e) {
             \rex_logger::factory()->log('error', 'REX_NEXTCLOUD_SHARE: Share-Link konnte nicht erstellt werden', [
                 'path'  => $path,
+                'connection' => $connectionId,
                 'error' => $e->getMessage(),
             ]);
             return '';

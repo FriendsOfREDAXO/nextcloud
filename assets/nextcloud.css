@@ -1,0 +1,869 @@
+/* ==========================================================================
+   nextcloud-Addon – Backend-Seite (pages/main.php)
+   Eigene --nc-*-Custom-Properties, optisch an MediaPlace angelehnt (siehe
+   mediaplace/assets/mediaplace.css fuer das Vorbild-Muster), aber ein
+   eigenstaendiges Token-Set -- kein Shared-Code zwischen den Addons.
+   Bleibt bewusst eine normale, inline eingebettete REDAXO-Backend-Seite
+   (kein Vollbild-Overlay wie MediaPlace selbst), daher hier nur DREI
+   Light/Dark-Bloecke (:root / body.rex-theme-dark / prefers-color-scheme) --
+   kein viertes In-Page-Dark-Toggle-Aequivalent wie MediaPlace's
+   .mp3-dark-mode, das existiert hier nicht.
+   ========================================================================== */
+
+:root {
+    /* Palette wie im REDAXO-Backend-Theme (be_style _variables.scss):
+       a-lighter #f3f6fb, a-light #dfe3e9, a #9ca5b2, a-dark #324050,
+       a-darker #283542, b (brand-primary) #4b9ad9, danger #d9534f */
+    --nc-bg: #fff;
+    --nc-border: #dfe3e9;
+    --nc-text: #324050;
+    --nc-text-muted: #68727d;
+    --nc-accent: #4b9ad9;
+    --nc-accent-hover: #2f7ab8;
+    --nc-accent-soft: #dbedf7;
+
+    --nc-header-bg: #f3f6fb;
+    --nc-header-border: #dfe3e9;
+
+    --nc-accounts-bg: #f3f6fb;
+    --nc-accounts-border: #dfe3e9;
+    --nc-account-text: #324050;
+    --nc-account-hover-bg: #dfe3e9;
+    --nc-account-active-bg: #dbedf7;
+    --nc-account-active-border: #324050;
+
+    --nc-breadcrumb-bg: #f3f6fb;
+    --nc-breadcrumb-border: #dfe3e9;
+    --nc-breadcrumb-link: #4b9ad9;
+    --nc-breadcrumb-link-hover: #2f7ab8;
+    --nc-breadcrumb-sep: #68727d;
+
+    --nc-input-bg: #fff;
+    --nc-input-border: #c7ccd3;
+    --nc-input-text: #324050;
+    --nc-input-focus-border: #324050;
+    --nc-input-focus-shadow: rgba(50, 64, 80, 0.15);
+    --nc-search-icon: #68727d;
+
+    --nc-row-hover-bg: #f3f6fb;
+    --nc-row-border: #dfe3e9;
+    --nc-row-name: #324050;
+    --nc-row-meta: #68727d;
+    --nc-row-icon: #68727d;
+    --nc-row-icon-folder: #e8b339;
+    --nc-row-selected-bg: #dbedf7;
+    --nc-row-selected-border: #324050;
+
+    --nc-action-icon-bg: transparent;
+    --nc-action-icon-text: #68727d;
+    --nc-action-icon-hover-bg: #dfe3e9;
+    --nc-action-icon-hover-text: #324050;
+    --nc-action-danger-hover-bg: #fbeceb;
+    --nc-action-danger-hover-text: #d9534f;
+
+    --nc-btn-primary-bg: #324050;
+    --nc-btn-primary-hover-bg: #283542;
+    --nc-btn-primary-text: #fff;
+    --nc-btn-accent-bg: #4b9ad9;
+    --nc-btn-accent-hover-bg: #2f7ab8;
+
+    --nc-modal-bg: #fff;
+    --nc-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    --nc-modal-preview-bg: #f3f6fb;
+    --nc-modal-meta-border: #dfe3e9;
+    --nc-modal-meta-label: #68727d;
+    --nc-modal-meta-text: #324050;
+
+    --nc-alert-info-bg: #dbedf7;
+    --nc-alert-info-text: #244a68;
+    --nc-alert-warning-bg: #fdf3d6;
+    --nc-alert-warning-text: #7a5c00;
+    --nc-alert-danger-bg: #fbeceb;
+    --nc-alert-danger-text: #a83a33;
+
+    --nc-progress-bg: #dfe3e9;
+    --nc-progress-bar-bg: #4b9ad9;
+
+    --nc-empty-text: #68727d;
+}
+
+/* ============================================================
+   Dark Mode (explizites Backend-Theme: body.rex-theme-dark)
+   ============================================================ */
+body.rex-theme-dark {
+    --nc-bg: #1a202c;
+    --nc-border: #3a4557;
+    --nc-text: #e2e6ea;
+    --nc-text-muted: #9aa5b1;
+    --nc-accent: #6c9bd2;
+    --nc-accent-hover: #8ab8e8;
+    --nc-accent-soft: rgba(108, 155, 210, 0.16);
+
+    --nc-header-bg: #212836;
+    --nc-header-border: #3a4557;
+
+    --nc-accounts-bg: #212836;
+    --nc-accounts-border: #3a4557;
+    --nc-account-text: #ccc;
+    --nc-account-hover-bg: #384252;
+    --nc-account-active-bg: #2d3748;
+    --nc-account-active-border: #6c9bd2;
+
+    --nc-breadcrumb-bg: #212836;
+    --nc-breadcrumb-border: #3a4557;
+    --nc-breadcrumb-link: #6c9bd2;
+    --nc-breadcrumb-link-hover: #8ab8e8;
+    --nc-breadcrumb-sep: #777;
+
+    --nc-input-bg: #2d3748;
+    --nc-input-border: #4a5568;
+    --nc-input-text: #eee;
+    --nc-input-focus-border: #6c9bd2;
+    --nc-input-focus-shadow: rgba(108, 155, 210, 0.2);
+    --nc-search-icon: #9aa5b1;
+
+    --nc-row-hover-bg: #212836;
+    --nc-row-border: #3a4557;
+    --nc-row-name: #e2e6ea;
+    --nc-row-meta: #9aa5b1;
+    --nc-row-icon: #9aa5b1;
+    --nc-row-icon-folder: #e0b64a;
+    --nc-row-selected-bg: #2d3748;
+    --nc-row-selected-border: #6c9bd2;
+
+    --nc-action-icon-bg: transparent;
+    --nc-action-icon-text: #9aa5b1;
+    --nc-action-icon-hover-bg: #384252;
+    --nc-action-icon-hover-text: #eee;
+    --nc-action-danger-hover-bg: #3a2020;
+    --nc-action-danger-hover-text: #e57369;
+
+    --nc-btn-primary-bg: #4b6078;
+    --nc-btn-primary-hover-bg: #6c9bd2;
+    --nc-btn-primary-text: #fff;
+    --nc-btn-accent-bg: #4b6078;
+    --nc-btn-accent-hover-bg: #6c9bd2;
+
+    --nc-modal-bg: #1a202c;
+    --nc-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    --nc-modal-preview-bg: #212836;
+    --nc-modal-meta-border: #3a4557;
+    --nc-modal-meta-label: #9aa5b1;
+    --nc-modal-meta-text: #e2e6ea;
+
+    --nc-alert-info-bg: #212836;
+    --nc-alert-info-text: #8ab8e8;
+    --nc-alert-warning-bg: #3a3320;
+    --nc-alert-warning-text: #e0c360;
+    --nc-alert-danger-bg: #3a2020;
+    --nc-alert-danger-text: #e57369;
+
+    --nc-progress-bg: #3a4557;
+    --nc-progress-bar-bg: #6c9bd2;
+
+    --nc-empty-text: #9aa5b1;
+}
+
+/* ============================================================
+   Dark Mode (System-Praeferenz, kein expliziter Light-Modus gewaehlt)
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+    body.rex-has-theme:not(.rex-theme-light) {
+        --nc-bg: #1a202c;
+        --nc-border: #3a4557;
+        --nc-text: #e2e6ea;
+        --nc-text-muted: #9aa5b1;
+        --nc-accent: #6c9bd2;
+        --nc-accent-hover: #8ab8e8;
+        --nc-accent-soft: rgba(108, 155, 210, 0.16);
+
+        --nc-header-bg: #212836;
+        --nc-header-border: #3a4557;
+
+        --nc-accounts-bg: #212836;
+        --nc-accounts-border: #3a4557;
+        --nc-account-text: #ccc;
+        --nc-account-hover-bg: #384252;
+        --nc-account-active-bg: #2d3748;
+        --nc-account-active-border: #6c9bd2;
+
+        --nc-breadcrumb-bg: #212836;
+        --nc-breadcrumb-border: #3a4557;
+        --nc-breadcrumb-link: #6c9bd2;
+        --nc-breadcrumb-link-hover: #8ab8e8;
+        --nc-breadcrumb-sep: #777;
+
+        --nc-input-bg: #2d3748;
+        --nc-input-border: #4a5568;
+        --nc-input-text: #eee;
+        --nc-input-focus-border: #6c9bd2;
+        --nc-input-focus-shadow: rgba(108, 155, 210, 0.2);
+        --nc-search-icon: #9aa5b1;
+
+        --nc-row-hover-bg: #212836;
+        --nc-row-border: #3a4557;
+        --nc-row-name: #e2e6ea;
+        --nc-row-meta: #9aa5b1;
+        --nc-row-icon: #9aa5b1;
+        --nc-row-icon-folder: #e0b64a;
+        --nc-row-selected-bg: #2d3748;
+        --nc-row-selected-border: #6c9bd2;
+
+        --nc-action-icon-bg: transparent;
+        --nc-action-icon-text: #9aa5b1;
+        --nc-action-icon-hover-bg: #384252;
+        --nc-action-icon-hover-text: #eee;
+        --nc-action-danger-hover-bg: #3a2020;
+        --nc-action-danger-hover-text: #e57369;
+
+        --nc-btn-primary-bg: #4b6078;
+        --nc-btn-primary-hover-bg: #6c9bd2;
+        --nc-btn-primary-text: #fff;
+        --nc-btn-accent-bg: #4b6078;
+        --nc-btn-accent-hover-bg: #6c9bd2;
+
+        --nc-modal-bg: #1a202c;
+        --nc-modal-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        --nc-modal-preview-bg: #212836;
+        --nc-modal-meta-border: #3a4557;
+        --nc-modal-meta-label: #9aa5b1;
+        --nc-modal-meta-text: #e2e6ea;
+
+        --nc-alert-info-bg: #212836;
+        --nc-alert-info-text: #8ab8e8;
+        --nc-alert-warning-bg: #3a3320;
+        --nc-alert-warning-text: #e0c360;
+        --nc-alert-danger-bg: #3a2020;
+        --nc-alert-danger-text: #e57369;
+
+        --nc-progress-bg: #3a4557;
+        --nc-progress-bar-bg: #6c9bd2;
+
+        --nc-empty-text: #9aa5b1;
+    }
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+#nc-app {
+    color: var(--nc-text);
+}
+
+#nc-app * {
+    box-sizing: border-box;
+}
+
+#nc-app .nc-card {
+    background: var(--nc-bg);
+    border: 1px solid var(--nc-border);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+/* ---- Account-Umschalter (Mehrkonten) ----
+   Optisch an MediaPlace's .mp3-provider-root-Eintraege angelehnt. */
+#nc-app .nc-accounts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 10px;
+    background: var(--nc-accounts-bg);
+    border-bottom: 1px solid var(--nc-accounts-border);
+}
+
+#nc-app .nc-account-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--nc-account-text);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+#nc-app .nc-account-item:hover {
+    background: var(--nc-account-hover-bg);
+}
+
+#nc-app .nc-account-item.nc-account-active {
+    background: var(--nc-account-active-bg);
+    border-color: var(--nc-account-active-border);
+    font-weight: 600;
+}
+
+#nc-app .nc-account-item i {
+    font-size: 13px;
+    opacity: 0.8;
+}
+
+/* ---- Kopfzeile ---- */
+#nc-app .nc-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--nc-header-bg);
+    border-bottom: 1px solid var(--nc-header-border);
+    flex-wrap: wrap;
+}
+
+#nc-app .nc-header-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--nc-text);
+}
+
+#nc-app .nc-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+/* .nc-btn/.nc-icon-btn sind bewusst NICHT unter #nc-app gescoped -- die drei
+   Modals (Vorschau/Upload/Share) werden per JS an document.body angehaengt
+   (siehe nextcloud.js), liegen also ausserhalb von #nc-app, nutzen aber
+   dieselben Button-Klassen. */
+.nc-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 500;
+    border-radius: 3px;
+    border: 1px solid var(--nc-border);
+    background: var(--nc-bg);
+    color: var(--nc-text);
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.nc-btn:hover {
+    background: var(--nc-row-hover-bg);
+}
+
+.nc-btn-primary {
+    background: var(--nc-btn-primary-bg);
+    border-color: var(--nc-btn-primary-bg);
+    color: var(--nc-btn-primary-text);
+}
+
+.nc-btn-primary:hover {
+    background: var(--nc-btn-primary-hover-bg);
+    border-color: var(--nc-btn-primary-hover-bg);
+    color: var(--nc-btn-primary-text);
+}
+
+.nc-btn-accent {
+    background: var(--nc-btn-accent-bg);
+    border-color: var(--nc-btn-accent-bg);
+    color: #fff;
+}
+
+.nc-btn-accent:hover {
+    background: var(--nc-btn-accent-hover-bg);
+    border-color: var(--nc-btn-accent-hover-bg);
+    color: #fff;
+}
+
+.nc-btn-danger {
+    background: #d9534f;
+    border-color: #d9534f;
+    color: #fff;
+}
+
+.nc-btn-danger:hover {
+    background: #c9302c;
+    border-color: #c9302c;
+}
+
+.nc-btn[disabled] {
+    opacity: 0.5;
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ---- Toolbar: Kategorie-Auswahl + Breadcrumb + Suche ---- */
+#nc-app .nc-toolbar {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--nc-border);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#nc-app .nc-toolbar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+#nc-app .nc-category-select {
+    min-width: 220px;
+    max-width: 340px;
+}
+
+#nc-app .nc-breadcrumb {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 12px;
+    background: var(--nc-breadcrumb-bg);
+    border: 1px solid var(--nc-breadcrumb-border);
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+#nc-app .nc-breadcrumb a {
+    color: var(--nc-breadcrumb-link);
+    text-decoration: none;
+}
+
+#nc-app .nc-breadcrumb a:hover {
+    color: var(--nc-breadcrumb-link-hover);
+    text-decoration: underline;
+}
+
+#nc-app .nc-breadcrumb-sep {
+    color: var(--nc-breadcrumb-sep);
+}
+
+#nc-app .nc-breadcrumb-current {
+    color: var(--nc-text);
+    font-weight: 600;
+}
+
+#nc-app .nc-search {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+#nc-app .nc-search-input-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 420px;
+}
+
+#nc-app .nc-search-input-wrap:focus-within i {
+    color: var(--nc-accent);
+}
+
+#nc-app .nc-search-input-wrap i {
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--nc-search-icon);
+    font-size: 12px;
+}
+
+#nc-app .nc-search-input {
+    width: 100%;
+    padding: 7px 10px 7px 28px;
+    font-size: 12px;
+    color: var(--nc-input-text);
+    background: var(--nc-input-bg);
+    border: 1px solid var(--nc-input-border);
+    border-radius: 3px;
+}
+
+#nc-app .nc-search-input:focus {
+    outline: none;
+    border-color: var(--nc-input-focus-border);
+    box-shadow: 0 0 0 3px var(--nc-input-focus-shadow);
+    background: var(--nc-accent-soft);
+}
+
+#nc-app .nc-search-count {
+    font-size: 11px;
+    color: var(--nc-text-muted);
+}
+
+/* ---- Datei-/Ordner-Liste ---- */
+#nc-app .nc-list {
+    display: flex;
+    flex-direction: column;
+}
+
+#nc-app .nc-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--nc-row-border);
+    transition: background 0.1s;
+}
+
+#nc-app .nc-row:last-child {
+    border-bottom: none;
+}
+
+#nc-app .nc-row:hover {
+    background: var(--nc-row-hover-bg);
+}
+
+#nc-app .nc-row-folder {
+    cursor: pointer;
+}
+
+#nc-app .nc-row-selected {
+    background: var(--nc-row-selected-bg);
+    box-shadow: inset 3px 0 0 var(--nc-row-selected-border);
+}
+
+#nc-app .nc-row-check {
+    width: 20px;
+    flex: 0 0 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#nc-app .nc-row-check input {
+    transform: scale(1.15);
+    cursor: pointer;
+}
+
+#nc-app .nc-row-icon {
+    width: 28px;
+    flex: 0 0 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    color: var(--nc-row-icon);
+}
+
+#nc-app .nc-row-icon .fa-folder,
+#nc-app .nc-row-icon .fa-folder-o {
+    color: var(--nc-row-icon-folder);
+}
+
+#nc-app .nc-row-name {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+#nc-app .nc-row-name a,
+#nc-app .nc-row-name span.nc-row-name-text {
+    color: var(--nc-row-name);
+    font-weight: 500;
+    font-size: 13px;
+    text-decoration: none;
+    word-break: break-word;
+}
+
+#nc-app .nc-row-name a:hover {
+    color: var(--nc-accent-hover);
+    text-decoration: underline;
+}
+
+#nc-app .nc-row-hint {
+    font-size: 11px;
+    color: var(--nc-row-meta);
+    margin-top: 2px;
+    word-break: break-word;
+}
+
+#nc-app .nc-row-size,
+#nc-app .nc-row-date {
+    flex: 0 0 110px;
+    font-size: 12px;
+    color: var(--nc-row-meta);
+    white-space: nowrap;
+}
+
+#nc-app .nc-row-actions {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    white-space: nowrap;
+}
+
+/* Ebenfalls global (nicht #nc-app-gescoped) -- siehe .nc-btn-Kommentar oben,
+   auch die Vorschau-Modal-Aktionsreihe nutzt Icon-Buttons. */
+.nc-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 3px;
+    background: var(--nc-action-icon-bg);
+    color: var(--nc-action-icon-text);
+    cursor: pointer;
+    font-size: 12px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.nc-icon-btn:hover {
+    background: var(--nc-action-icon-hover-bg);
+    color: var(--nc-action-icon-hover-text);
+}
+
+.nc-icon-btn-danger:hover {
+    background: var(--nc-action-danger-hover-bg);
+    color: var(--nc-action-danger-hover-text);
+}
+
+#nc-app .nc-empty,
+#nc-app .nc-loading {
+    padding: 30px 16px;
+    text-align: center;
+    color: var(--nc-empty-text);
+    font-size: 13px;
+}
+
+/* Nicht #nc-app-gescoped -- wird auch fuer #share-error im Share-Modal
+   verwendet (an document.body angehaengt, siehe nextcloud.js). */
+.nc-error {
+    margin: 12px 16px;
+    padding: 10px 12px;
+    background: var(--nc-alert-danger-bg);
+    color: var(--nc-alert-danger-text);
+    border-radius: 3px;
+    font-size: 12px;
+}
+
+/* ---- Hinweis: kein Account konfiguriert ---- */
+#nc-app .nc-notice {
+    margin: 16px;
+    padding: 14px 16px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+#nc-app .nc-notice-warning {
+    background: var(--nc-alert-warning-bg);
+    color: var(--nc-alert-warning-text);
+}
+
+#nc-app .nc-notice a {
+    font-weight: 600;
+    text-decoration: underline;
+}
+
+/* ============================================================
+   Modals -- Bootstrap-Grundmechanik (modal fade / data-dismiss) bleibt,
+   Inhalt/Struktur/Klassen sind MediaPlace-Detail-Panel-inspiriert neu
+   gebaut (grosse Vorschau, Meta-Tabelle, Aktions-Icon-Reihe).
+   ============================================================ */
+.nc-modal .modal-content {
+    background: var(--nc-modal-bg);
+    color: var(--nc-text);
+    border-radius: 4px;
+    border: none;
+    box-shadow: var(--nc-modal-shadow);
+}
+
+.nc-modal .modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--nc-border);
+    padding: 14px 18px;
+}
+
+/* min-width:0 ist noetig, damit ein Flex-Kind ueberhaupt unter seine
+   eigene Inhaltsbreite schrumpfen darf (Flexbox-Default ist min-width:auto)
+   -- ohne das drueckt ein langer Dateiname (Vorschau-Modal-Titel = voller
+   Dateiname) den Close-Button aus dem sichtbaren Bereich, statt selbst
+   umzubrechen. */
+.nc-modal .modal-title {
+    font-size: 14px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    word-break: break-word;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.nc-modal .modal-body {
+    padding: 18px;
+}
+
+.nc-modal .modal-footer {
+    border-top: 1px solid var(--nc-border);
+    padding: 12px 18px;
+}
+
+.nc-modal .close {
+    color: var(--nc-text);
+    opacity: 0.6;
+    text-shadow: none;
+    /* Garantiert ganz rechts fixiert, egal wie lang der Titel daneben ist
+       (siehe .modal-title-Kommentar oben) -- schrumpft nie. */
+    flex-shrink: 0;
+}
+
+.nc-modal .close:hover {
+    opacity: 1;
+}
+
+/* ---- Vorschau-Modal ---- */
+.nc-preview-stage {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 220px;
+    max-height: 60vh;
+    background: var(--nc-modal-preview-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 14px;
+}
+
+.nc-preview-stage img,
+.nc-preview-stage video {
+    max-width: 100%;
+    max-height: 60vh;
+    display: block;
+}
+
+.nc-preview-stage iframe {
+    width: 100%;
+    height: 60vh;
+    border: none;
+}
+
+.nc-preview-stage .nc-preview-icon {
+    font-size: 64px;
+    color: var(--nc-text-muted);
+}
+
+.nc-meta-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+    margin-bottom: 14px;
+}
+
+.nc-meta-table td {
+    padding: 5px 0;
+    border-bottom: 1px solid var(--nc-modal-meta-border);
+    vertical-align: top;
+}
+
+.nc-meta-table td:first-child {
+    width: 110px;
+    color: var(--nc-modal-meta-label);
+    font-weight: 500;
+}
+
+.nc-meta-table td:last-child {
+    color: var(--nc-modal-meta-text);
+    word-break: break-word;
+}
+
+.nc-detail-actions-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.nc-detail-actions-row .nc-btn {
+    flex: 1 1 auto;
+    justify-content: center;
+}
+
+/* ---- Upload-/Share-Modal ---- */
+.nc-form-group {
+    margin-bottom: 14px;
+}
+
+.nc-form-group label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--nc-text-muted);
+    margin-bottom: 5px;
+}
+
+.nc-hint {
+    font-size: 11px;
+    color: var(--nc-text-muted);
+    margin-top: 4px;
+}
+
+.nc-share-result {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: var(--nc-alert-info-bg);
+    color: var(--nc-alert-info-text);
+    border-radius: 3px;
+}
+
+.nc-share-url-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.nc-share-url-row input {
+    flex: 1;
+    font-size: 12px;
+    padding: 6px 8px;
+    border: 1px solid var(--nc-input-border);
+    border-radius: 3px;
+    background: var(--nc-input-bg);
+    color: var(--nc-input-text);
+}
+
+.nc-progress {
+    height: 8px;
+    background: var(--nc-progress-bg);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+}
+
+.nc-progress-bar {
+    height: 100%;
+    background: var(--nc-progress-bar-bg);
+    transition: width 0.2s;
+}
+
+.nc-modal-status {
+    text-align: center;
+    font-size: 12px;
+    color: var(--nc-text-muted);
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+@media (max-width: 700px) {
+    #nc-app .nc-row-size,
+    #nc-app .nc-row-date {
+        display: none;
+    }
+
+    #nc-app .nc-toolbar-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    #nc-app .nc-search-input-wrap {
+        max-width: none;
+    }
+}

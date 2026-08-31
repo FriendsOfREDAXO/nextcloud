@@ -13,15 +13,16 @@ Ein praktisches AddOn zur Integration einer NextCloud-Instanz in REDAXO. Es erm�
 - Unterstützung verschiedener Dateitypen
 - Backup-Cron zu NextCloud
 
-## Installation 
+## Installation
 
-1. Das AddOn über den REDAXO Installer herunterladen
+**Seit Version 2.0.0** ist dieses AddOn ein Client von [`cloudconnect`](https://github.com/FriendsOfREDAXO/cloudconnect) und speichert selbst keine Zugangsdaten mehr – `cloudconnect` muss installiert sein (wird als Abhängigkeit automatisch mitinstalliert).
+
+1. Das AddOn über den REDAXO Installer herunterladen (installiert `cloudconnect` mit, falls noch nicht vorhanden)
 2. Installation durchführen
-3. In den Einstellungen die NextCloud-Verbindung konfigurieren:
-   - NextCloud-URL eingeben (z.B. `https://cloud.example.com`)
-   - Benutzername festlegen
-   - App-Passwort aus den NextCloud-Einstellungen eintragen
-   - **Optional**: Root-Ordner festlegen (z.B. `/medien` für einen spezifischen Startordner)
+3. Nextcloud-Verbindung(en) in **CloudConnect → Einstellungen** anlegen (URL, Benutzername, App-Passwort, optional Root-Ordner) – beliebig viele gleichzeitig möglich, ein Konto-Umschalter im `nextcloud`-Backend erlaubt den Wechsel
+4. In **NextCloud → Einstellungen** stehen nur noch die accountübergreifenden Feature-Einstellungen: Share-Links aktivieren/deaktivieren, Tag-Mapping-Zielfeld. Die schreibgeschützte Konto-Liste dort verlinkt direkt zu cloudconnect.
+
+**Update von einer Version vor 2.0.0**: Bestehende Zugangsdaten werden beim ersten Seitenaufruf nach dem Update automatisch und einmalig als neue cloudconnect-Verbindung übernommen – keine manuelle Neueinrichtung nötig.
 
 ## Einrichtung in NextCloud
 
@@ -59,8 +60,7 @@ Mit diesem Addon ist ein spezieller Cronjob für automatische Backups verfügbar
 
 ### Voraussetzungen
 
-- Eine NextCloud-Instanz mit WebDAV-Zugang
-- App-Passwort für den NextCloud-Benutzer (aus Sicherheitsgründen empfohlen)
+- Ein in cloudconnect konfigurierter, aktiver Nextcloud-Account (siehe Installation oben)
 - cURL-Unterstützung auf dem Server
 - mysqldump und tar müssen auf dem Server verfügbar sein
 
@@ -75,9 +75,7 @@ Mit diesem Addon ist ein spezieller Cronjob für automatische Backups verfügbar
 
 | Einstellung | Beschreibung |
 |-------------|--------------|
-| NextCloud URL | Die URL deiner NextCloud-Instanz (z.B. https://nextcloud.example.com/) |
-| Benutzername | Dein NextCloud-Benutzername |
-| App-Passwort | Ein in den NextCloud-Einstellungen generiertes App-Passwort |
+| Nextcloud-Account | In cloudconnect konfigurierter Ziel-Account (**seit 2.0.0**: Auswahl statt eigener URL/Benutzername/Passwort-Felder) |
 | NextCloud Pfad | Das Zielverzeichnis in der NextCloud (z.B. backups/redaxo) |
 | Maximale Anzahl Backups | Ältere Backups werden automatisch gelöscht, wenn diese Anzahl überschritten wird |
 | Datenbank sichern | Legt fest, ob die Datenbank gesichert werden soll |
@@ -85,6 +83,8 @@ Mit diesem Addon ist ein spezieller Cronjob für automatische Backups verfügbar
 
 5. Konfiguriere die Ausführungshäufigkeit des Cronjobs (täglich, wöchentlich, etc.)
 6. Speichere den Cronjob
+
+Mehrere Cronjob-Instanzen mit jeweils unterschiedlichem Ziel-Account sichern parallel zu mehreren Nextcloud-Instanzen.
 
 ### Backup-Struktur
 

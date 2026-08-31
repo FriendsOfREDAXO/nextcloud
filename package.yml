@@ -1,5 +1,5 @@
 package: nextcloud
-version: '1.7.1'
+version: '2.0.0'
 author: FriendsOfREDAXO
 supportpage: https://github.com/FriendsOfREDAXO/nextcloud
 
@@ -7,6 +7,11 @@ requires:
     redaxo: '^5.18.0'
     php:
         version: '>=8.1'
+    packages:
+        # Seit 2.0.0: nextcloud haelt keine eigenen Zugangsdaten/keinen
+        # eigenen WebDAV-Client mehr, sondern ist Client von cloudconnect
+        # (Verbindungsverwaltung + Transport, siehe lib/nextcloud.php).
+        cloudconnect: '>=0.3.1'
 
 page:
     title: NextCloud
@@ -22,7 +27,7 @@ page:
 # Kein "permissions:"-Block hier -- REDAXO-Core kennt diesen YAML-Schluessel
 # nicht (reine tote YAML, siehe Bugreport), das taeuschte frueher eine
 # Registrierung nur vor. Feingranulare Rechte (nextcloud[upload_mediapool]/
-# [delete]/[download]/[mediaplace_browse]) werden jetzt echt in boot.php per
+# [delete]/[download]) werden jetzt echt in boot.php per
 # rex_perm::register() eingetragen, sonst tauchen sie in der
 # Rollenverwaltung gar nicht erst auf. nextcloud[] (Basis-Zugriff) braucht
 # das nicht -- das ist bereits der page-level "perm:" oben, wird von REDAXO

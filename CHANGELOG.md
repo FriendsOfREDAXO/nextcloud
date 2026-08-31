@@ -1,5 +1,27 @@
 # Changelog
 
+## [2.0.0] – 2026-08-31
+
+### Breaking Changes
+
+- Neue Pflicht-Abhängigkeit `cloudconnect >=0.3.1`. Dieses Addon speichert selbst keine Zugangsdaten mehr und macht keine eigenen WebDAV-/OCS-Requests mehr – `lib/nextcloud.php` ist jetzt ein dünner Feature-Layer über `cloudconnect`s `NextcloudClient` (Transport/Auth/SSL). Bestehende Zugangsdaten (`rex_config('nextcloud', 'baseurl'|'username'|'password'|'rootfolder')`) werden beim ersten Aufruf nach dem Update automatisch, einmalig und idempotent in eine neue cloudconnect-Verbindung migriert (`install.php`) – keine manuelle Neueinrichtung nötig.
+- Eigene MediaPlace-Cloud-Provider-Integration entfernt (`lib/MediaplaceProvider.php`, `MEDIAPLACE_STORAGE_PROVIDERS`-Registrierung, Recht `nextcloud[mediaplace_browse]`). Behebt den doppelten "Nextcloud"-Eintrag in MediaPlace's Cloud-Speicher-Sidebar – cloudconnect registriert bereits einen eigenen Provider für dieselben Verbindungen.
+- `nextcloud/lib/nextcloud.php`s Feld-Rückgabe von `listFiles()`/`searchFilesRecursive()` hat sich geändert: statt kategorisiertem `type` (`image`/`pdf`/`document`/…), vorformatierten `size`-Strings und fertig formatiertem `modified` liefern beide jetzt MediaPlace-kompatibel `type: 'file'|'folder'`, rohes `filesize` (Bytes) und unformatiertes `modified` – Formatierung/Icon-Auswahl passieren clientseitig in `nextcloud.js`. Betrifft nur eigenen Code, der direkt gegen diese PHP-Klasse programmiert (nicht die Backend-Seite selbst, die mit umgebaut wurde).
+- `NextCloud::__construct()` verlangt jetzt eine explizite `connection_id` (kein zero-arg-Konstruktor, kein globaler Fallback mehr).
+
+### Neu
+
+- Mehrkonten-fähig: beliebig viele, in cloudconnect konfigurierte Nextcloud-Accounts stehen gleichzeitig zur Verfügung. Neuer Konto-Umschalter im Backend (Browser-Seite, ZIP-Download, Import, Upload, Löschen, Share-Links – jede Aktion sendet ihre `connection_id` explizit), Backup-Cronjob wählt seinen Ziel-Account pro Instanz aus.
+- `REX_NEXTCLOUD_SHARE` unterstützt einen neuen, optionalen `connection`-Parameter (Account-Id); ohne Angabe wird weiterhin der erste aktive Account verwendet (rückwärtskompatibel zu bestehenden Modul-Ausgaben). Share-Link-Cache ist jetzt pro Account UND Pfad getrennt.
+- Vollständiger optischer Umbau der Backend-Seite: eigene `nextcloud.css` im MediaPlace-Farb-/Typografie-Look (REDAXO-Palette, Light/Dark), Datei-/Ordnerliste als Zeilenlayout statt `<table>`, alle drei Modals (Vorschau, Upload aus Medienpool, Share-Link) strukturell neu gebaut.
+- Backup-Cronjob (`rex_cronjob_redaxo_backup`) nutzt jetzt `cloudconnect`s `NextcloudClient` statt einer eigenen, zweiten WebDAV-Implementierung.
+- `pages/config.php` zeigt eine schreibgeschützte Liste der konfigurierten Accounts mit Link zu cloudconnect statt eigener Zugangsdaten-Felder.
+
+### Behoben
+
+- Dateigröße war in der Liste durchgängig 0 B, Änderungsdatum und MIME-Typ leer – lag an einem Parsing-Bug in `cloudconnect`s `NextcloudClient` (behoben in dessen Version 0.3.1, siehe dortiges Changelog), betraf durch die neue Client-Abhängigkeit auch dieses Addon.
+- Der Schließen-Button (X) in den drei Modals konnte bei langen Dateinamen im Titel aus dem sichtbaren Bereich gedrückt werden (Flexbox-Kind ohne `min-width: 0`) – Titel schrumpft/umbricht jetzt korrekt, X bleibt fix am rechten Rand.
+
 ## [1.7.1] – 2026-08-31
 
 ### Behoben
