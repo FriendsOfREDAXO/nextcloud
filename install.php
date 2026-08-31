@@ -29,3 +29,21 @@ if (!rex_config::get('nextcloud', 'migrated_to_cloudconnect', false)) {
 
     rex_config::set('nextcloud', 'migrated_to_cloudconnect', true);
 }
+
+/**
+ * Cronjob-Klasse wurde in den Addon-Namespace verschoben
+ * (rex_cronjob_redaxo_backup -> FriendsOfRedaxo\NextCloud\rex_cronjob_redaxo_backup,
+ * siehe lib/nextcloud_backup.php und github.com/FriendsOfREDAXO/nextcloud/issues/9)
+ * -- bereits konfigurierte Cronjob-Instanzen verweisen in der DB noch auf den
+ * alten, globalen Klassennamen und wuerden sonst als "unbekannter Typ"
+ * erscheinen. Eigener Marker, unabhaengig von der Verbindungs-Migration oben
+ * (kann zeitlich getrennt ausgeliefert/aktualisiert werden).
+ */
+if (!rex_config::get('nextcloud', 'migrated_cronjob_namespace', false)) {
+    rex_sql::factory()->setQuery(
+        'UPDATE ' . rex::getTable('cronjob') . ' SET type = ? WHERE type = ?',
+        ['FriendsOfRedaxo\\NextCloud\\rex_cronjob_redaxo_backup', 'rex_cronjob_redaxo_backup'],
+    );
+
+    rex_config::set('nextcloud', 'migrated_cronjob_namespace', true);
+}

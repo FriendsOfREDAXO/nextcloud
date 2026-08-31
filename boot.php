@@ -15,7 +15,7 @@ namespace FriendsOfRedaxo\NextCloud;
 \rex_perm::register('nextcloud[download]', \rex_i18n::msg('nextcloud_perm_download'));
 
 if (\rex_addon::get('cronjob')->isAvailable()) {
-    \rex_cronjob_manager::registerType(\rex_cronjob_redaxo_backup::class);
+    \rex_cronjob_manager::registerType(rex_cronjob_redaxo_backup::class);
 }
 
 // Seit 2.0.0 KEINE eigene MediaPlace-Cloud-Provider-Integration mehr --

@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1] – 2026-08-31
+
+### Geändert
+
+- Backup-Cronjob-Klasse `rex_cronjob_redaxo_backup` in den Addon-Namespace verschoben (`FriendsOfRedaxo\NextCloud\rex_cronjob_redaxo_backup`), passend zum Rest der Klassen dieses Addons ([#9](https://github.com/FriendsOfREDAXO/nextcloud/issues/9)). Bereits konfigurierte Cronjob-Instanzen werden beim Update automatisch auf den neuen Klassennamen migriert (`install.php`), keine manuelle Anpassung nötig.
+
 ## [2.0.0] – 2026-08-31
 
 ### Breaking Changes

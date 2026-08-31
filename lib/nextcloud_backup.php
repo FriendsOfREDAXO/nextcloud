@@ -1,4 +1,7 @@
 <?php
+
+namespace FriendsOfRedaxo\NextCloud;
+
 /**
  * REDAXO Backup Cronjob
  *
@@ -16,7 +19,7 @@
  * rex_config gespeichert. Zwei Cronjob-Eintraege = Backup zu zwei
  * verschiedenen Accounts, ohne Code-Duplizierung.
  */
-class rex_cronjob_redaxo_backup extends rex_cronjob
+class rex_cronjob_redaxo_backup extends \rex_cronjob
 {
     public function execute()
     {
@@ -30,30 +33,30 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         $backupFiles = '1' === $this->getParam('backup_files');
 
         if (!$backupDb && !$backupFiles) {
-            return [false, rex_i18n::msg('nextcloud_backup_no_type_selected')];
+            return [false, \rex_i18n::msg('nextcloud_backup_no_type_selected')];
         }
 
         if (!function_exists('curl_init')) {
-            return [false, rex_i18n::msg('nextcloud_backup_curl_not_available')];
+            return [false, \rex_i18n::msg('nextcloud_backup_curl_not_available')];
         }
 
         if ('' === $connectionId) {
-            return [false, rex_i18n::msg('nextcloud_backup_config_missing')];
+            return [false, \rex_i18n::msg('nextcloud_backup_config_missing')];
         }
 
         $connection = \FriendsOfRedaxo\CloudConnect\ConnectionStore::get($connectionId);
         if (null === $connection || 'nextcloud' !== ($connection['type'] ?? '') || !\FriendsOfRedaxo\CloudConnect\ConnectionStore::isComplete($connection)) {
-            return [false, rex_i18n::msg('nextcloud_backup_config_missing')];
+            return [false, \rex_i18n::msg('nextcloud_backup_config_missing')];
         }
 
         try {
             $client = new \FriendsOfRedaxo\CloudConnect\Nextcloud\NextcloudClient($connectionId);
-        } catch (Exception $e) {
-            return [false, rex_i18n::msg('nextcloud_backup_connection_error') . ': ' . $e->getMessage()];
+        } catch (\Exception $e) {
+            return [false, \rex_i18n::msg('nextcloud_backup_connection_error') . ': ' . $e->getMessage()];
         }
 
         // Basis-Verzeichnis fuer temporaere Backups
-        $backupBaseDir = rex_path::base('backup');
+        $backupBaseDir = \rex_path::base('backup');
         if (!file_exists($backupBaseDir)) {
             mkdir($backupBaseDir, 0755, true);
         }
@@ -76,8 +79,8 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
             $this->ensureDirectoryExists($connection['config'], $rootDir);
             $this->ensureDirectoryExists($connection['config'], $dbDir);
             $this->ensureDirectoryExists($connection['config'], $filesDir);
-        } catch (Exception $e) {
-            return [false, rex_i18n::msg('nextcloud_backup_dir_create_error', $nextcloudPath, $e->getMessage())];
+        } catch (\Exception $e) {
+            return [false, \rex_i18n::msg('nextcloud_backup_dir_create_error', $nextcloudPath, $e->getMessage())];
         }
 
         $dbFile = null;
@@ -88,7 +91,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
             try {
                 $dbFile = $backupBaseDir . '/redaxo_db_' . $timestamp . '.sql.gz';
 
-                $db = rex::getProperty('db');
+                $db = \rex::getProperty('db');
                 $dbHost = $db[1]['host'];
                 $dbName = $db[1]['name'];
                 $dbUser = $db[1]['login'];
@@ -107,28 +110,28 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
 
                 if (0 !== $returnVar) {
                     $success = false;
-                    $message[] = rex_i18n::msg('nextcloud_backup_db_error') . ': ' . implode("\n", $output);
+                    $message[] = \rex_i18n::msg('nextcloud_backup_db_error') . ': ' . implode("\n", $output);
                 } else {
-                    $message[] = rex_i18n::msg('nextcloud_backup_db_success') . ': ' . basename($dbFile);
+                    $message[] = \rex_i18n::msg('nextcloud_backup_db_success') . ': ' . basename($dbFile);
 
                     try {
                         $client->putContent($dbDir . '/' . basename($dbFile), (string) \rex_file::get($dbFile));
-                        $message[] = rex_i18n::msg('nextcloud_backup_db_upload_success');
-                    } catch (Exception $e) {
+                        $message[] = \rex_i18n::msg('nextcloud_backup_db_upload_success');
+                    } catch (\Exception $e) {
                         $success = false;
-                        $message[] = rex_i18n::msg('nextcloud_backup_db_upload_error') . ': ' . $e->getMessage();
+                        $message[] = \rex_i18n::msg('nextcloud_backup_db_upload_error') . ': ' . $e->getMessage();
                     }
                 }
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $success = false;
-                $message[] = rex_i18n::msg('nextcloud_backup_db_exception') . ': ' . $e->getMessage();
+                $message[] = \rex_i18n::msg('nextcloud_backup_db_exception') . ': ' . $e->getMessage();
             }
         }
 
         // Dateisystem-Backup erstellen
         if ($backupFiles) {
             try {
-                $filesDirLocal = rex_path::base();
+                $filesDirLocal = \rex_path::base();
                 $filesFile = $backupBaseDir . '/redaxo_files_' . $timestamp . '.tar.gz';
 
                 $excludeDirs = [
@@ -155,21 +158,21 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
 
                 if (0 !== $returnVar) {
                     $success = false;
-                    $message[] = rex_i18n::msg('nextcloud_backup_files_error') . ': ' . implode("\n", $output);
+                    $message[] = \rex_i18n::msg('nextcloud_backup_files_error') . ': ' . implode("\n", $output);
                 } else {
-                    $message[] = rex_i18n::msg('nextcloud_backup_files_success') . ': ' . basename($filesFile);
+                    $message[] = \rex_i18n::msg('nextcloud_backup_files_success') . ': ' . basename($filesFile);
 
                     try {
                         $client->putContent($filesDir . '/' . basename($filesFile), (string) \rex_file::get($filesFile));
-                        $message[] = rex_i18n::msg('nextcloud_backup_files_upload_success');
-                    } catch (Exception $e) {
+                        $message[] = \rex_i18n::msg('nextcloud_backup_files_upload_success');
+                    } catch (\Exception $e) {
                         $success = false;
-                        $message[] = rex_i18n::msg('nextcloud_backup_files_upload_error') . ': ' . $e->getMessage();
+                        $message[] = \rex_i18n::msg('nextcloud_backup_files_upload_error') . ': ' . $e->getMessage();
                     }
                 }
-            } catch (Exception $e) {
+            } catch (\Exception $e) {
                 $success = false;
-                $message[] = rex_i18n::msg('nextcloud_backup_files_exception') . ': ' . $e->getMessage();
+                $message[] = \rex_i18n::msg('nextcloud_backup_files_exception') . ': ' . $e->getMessage();
             }
         }
 
@@ -178,10 +181,10 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
             try {
                 $this->cleanupOldBackups($client, $dbDir, $maxBackups);
                 $this->cleanupOldBackups($client, $filesDir, $maxBackups);
-                $message[] = rex_i18n::msg('nextcloud_backup_cleanup_success', $maxBackups);
-            } catch (Exception $e) {
+                $message[] = \rex_i18n::msg('nextcloud_backup_cleanup_success', $maxBackups);
+            } catch (\Exception $e) {
                 $success = false;
-                $message[] = rex_i18n::msg('nextcloud_backup_cleanup_error') . ': ' . $e->getMessage();
+                $message[] = \rex_i18n::msg('nextcloud_backup_cleanup_error') . ': ' . $e->getMessage();
             }
         }
 
@@ -283,7 +286,7 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         curl_close($ch);
 
         if (0 !== $errno) {
-            throw new Exception('Connection error: ' . $error);
+            throw new \Exception('Connection error: ' . $error);
         }
 
         // Existiert bereits (207 Multi-Status ist der Normalfall) -- nichts zu tun.
@@ -309,16 +312,16 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         curl_close($ch);
 
         if (0 !== $mkErrno) {
-            throw new Exception('Connection error: ' . $mkError);
+            throw new \Exception('Connection error: ' . $mkError);
         }
         if ($mkStatus >= 400) {
-            throw new Exception('MKCOL failed (HTTP ' . $mkStatus . ')');
+            throw new \Exception('MKCOL failed (HTTP ' . $mkStatus . ')');
         }
     }
 
     public function getTypeName()
     {
-        return rex_i18n::msg('nextcloud_backup_type_name');
+        return \rex_i18n::msg('nextcloud_backup_type_name');
     }
 
     public function getParamFields()
@@ -327,43 +330,43 @@ class rex_cronjob_redaxo_backup extends rex_cronjob
         foreach (\FriendsOfRedaxo\CloudConnect\ConnectionStore::getByType('nextcloud') as $id => $connection) {
             $label = (string) ($connection['label'] ?? $id);
             if (!($connection['active'] ?? false)) {
-                $label .= ' (' . rex_i18n::msg('nextcloud_backup_connection_inactive') . ')';
+                $label .= ' (' . \rex_i18n::msg('nextcloud_backup_connection_inactive') . ')';
             }
             $connections[$id] = $label;
         }
 
         return [
             [
-                'label' => rex_i18n::msg('nextcloud_backup_connection'),
+                'label' => \rex_i18n::msg('nextcloud_backup_connection'),
                 'name' => 'connection_id',
                 'type' => 'select',
                 'options' => $connections,
-                'notice' => rex_i18n::msg('nextcloud_backup_connection_notice'),
+                'notice' => \rex_i18n::msg('nextcloud_backup_connection_notice'),
             ],
             [
-                'label' => rex_i18n::msg('nextcloud_backup_path'),
+                'label' => \rex_i18n::msg('nextcloud_backup_path'),
                 'name' => 'nextcloud_path',
                 'type' => 'text',
-                'notice' => rex_i18n::msg('nextcloud_backup_path_notice'),
+                'notice' => \rex_i18n::msg('nextcloud_backup_path_notice'),
             ],
             [
-                'label' => rex_i18n::msg('nextcloud_backup_max_count'),
+                'label' => \rex_i18n::msg('nextcloud_backup_max_count'),
                 'name' => 'max_backups',
                 'type' => 'text',
                 'default' => '5',
             ],
             [
-                'label' => rex_i18n::msg('nextcloud_backup_database'),
+                'label' => \rex_i18n::msg('nextcloud_backup_database'),
                 'name' => 'backup_db',
                 'type' => 'select',
-                'options' => ['0' => rex_i18n::msg('no'), '1' => rex_i18n::msg('yes')],
+                'options' => ['0' => \rex_i18n::msg('no'), '1' => \rex_i18n::msg('yes')],
                 'default' => '1',
             ],
             [
-                'label' => rex_i18n::msg('nextcloud_backup_files'),
+                'label' => \rex_i18n::msg('nextcloud_backup_files'),
                 'name' => 'backup_files',
                 'type' => 'select',
-                'options' => ['0' => rex_i18n::msg('no'), '1' => rex_i18n::msg('yes')],
+                'options' => ['0' => \rex_i18n::msg('no'), '1' => \rex_i18n::msg('yes')],
                 'default' => '1',
             ],
         ];
