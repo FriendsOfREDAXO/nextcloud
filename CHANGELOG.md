@@ -16,6 +16,7 @@
 - Vollständiger optischer Umbau der Backend-Seite: eigene `nextcloud.css` im MediaPlace-Farb-/Typografie-Look (REDAXO-Palette, Light/Dark), Datei-/Ordnerliste als Zeilenlayout statt `<table>`, alle drei Modals (Vorschau, Upload aus Medienpool, Share-Link) strukturell neu gebaut.
 - Backup-Cronjob (`rex_cronjob_redaxo_backup`) nutzt jetzt `cloudconnect`s `NextcloudClient` statt einer eigenen, zweiten WebDAV-Implementierung.
 - `pages/config.php` zeigt eine schreibgeschützte Liste der konfigurierten Accounts mit Link zu cloudconnect statt eigener Zugangsdaten-Felder.
+- Neue Galerie-Ansicht (Masonry) als Alternative zur Zeilenliste, umschaltbar über einen neuen Ansicht-Umschalter neben der Suche (Auswahl bleibt pro Browser in `localStorage` gemerkt). Kachel-Vorschaubilder für Bilder/Videos, Icon-Kacheln für PDFs/Dokumente/Ordner, volle Aktionen (Importieren/Herunterladen/Share-Link/Löschen) über eine Hover-Werkzeugleiste je Kachel.
 
 ### Behoben
 

@@ -20,9 +20,13 @@ var currentConnectionId = null;
 var currentPath = '/';
 var selectedFiles = new Set();
 var currentFiles = [];
+var lastRenderedFiles = [];
 var currentSearchTerm = '';
 var searchDebounceTimer = null;
 var searchRequestCounter = 0;
+// 'list' | 'masonry' -- eigener localStorage-Schluessel, getrennt von
+// 'nc_connection' (Konto-Wahl), gleiche Persistenz-Konvention.
+var currentViewMode = 'list';
 
 // -------------------------------------------------------------------------
 // Kleine Helfer
@@ -161,6 +165,102 @@ function switchAccount(id) {
     renderAccountSwitcher(ncConnections());
     selectedFiles.clear();
     openFolder('/');
+}
+
+// -------------------------------------------------------------------------
+// Ansicht-Umschalter (Liste/Galerie) -- ein einzelner Trigger-Button (zeigt
+// das Icon der aktiven Ansicht), oeffnet ein kleines, per JS positioniertes
+// Dropdown-Menue. Gleiches Grundmuster wie MediaPlace's
+// .mp3-view-toggle-wrap/-btn/-menu (siehe core.js dort), eigene nc-Klassen.
+// -------------------------------------------------------------------------
+var NC_VIEW_MODE_ICONS = { list: 'fa-list', masonry: 'fa-th-large' };
+
+function initViewMode() {
+    var saved = null;
+    try {
+        saved = localStorage.getItem('nc_view');
+    } catch (e) { /* ignore */ }
+    currentViewMode = 'masonry' === saved ? 'masonry' : 'list';
+    updateViewToggleTrigger();
+    updateViewToggleActiveItem();
+}
+
+function updateViewToggleTrigger() {
+    var icon = document.querySelector('.nc-view-toggle-btn i');
+    if (icon) {
+        icon.className = 'rex-icon ' + (NC_VIEW_MODE_ICONS[currentViewMode] || NC_VIEW_MODE_ICONS.list);
+    }
+}
+
+function updateViewToggleActiveItem() {
+    Array.prototype.forEach.call(document.querySelectorAll('.nc-view-toggle-menu .nc-view-btn'), function (btn) {
+        btn.classList.toggle('nc-view-active', btn.getAttribute('data-view') === currentViewMode);
+    });
+}
+
+function setViewMode(mode) {
+    if (mode === currentViewMode || !NC_VIEW_MODE_ICONS[mode]) {
+        return;
+    }
+    currentViewMode = mode;
+    try {
+        localStorage.setItem('nc_view', currentViewMode);
+    } catch (e) { /* ignore */ }
+    updateViewToggleTrigger();
+    updateViewToggleActiveItem();
+    // Re-render mit den zuletzt geladenen Daten (Ordnerinhalt ODER
+    // Suchergebnis) statt eines Server-Roundtrips -- lastRenderedFiles wird
+    // in renderFiles() bei jedem Aufruf aktuell gehalten.
+    renderFiles(lastRenderedFiles);
+}
+
+function initViewToggleUi() {
+    var wrap = document.getElementById('nc-view-toggle');
+    if (!wrap) {
+        return;
+    }
+    var btn = wrap.querySelector('.nc-view-toggle-btn');
+    var menu = wrap.querySelector('.nc-view-toggle-menu');
+    if (!btn || !menu) {
+        return;
+    }
+
+    function positionMenu() {
+        var rect = btn.getBoundingClientRect();
+        var menuWidth = Math.max(menu.offsetWidth, 150);
+        var left = Math.max(8, Math.min(rect.left, window.innerWidth - menuWidth - 8));
+        var top = rect.bottom + 4;
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
+    }
+
+    btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var willOpen = !wrap.classList.contains('nc-view-toggle-open');
+        wrap.classList.toggle('nc-view-toggle-open', willOpen);
+        if (willOpen) {
+            positionMenu();
+        }
+    });
+
+    document.addEventListener('click', function (e) {
+        if (!wrap.classList.contains('nc-view-toggle-open')) {
+            return;
+        }
+        if (e.target.closest('#nc-view-toggle')) {
+            return;
+        }
+        wrap.classList.remove('nc-view-toggle-open');
+    });
+
+    menu.addEventListener('click', function (e) {
+        var item = e.target.closest('.nc-view-btn');
+        if (!item) {
+            return;
+        }
+        wrap.classList.remove('nc-view-toggle-open');
+        setViewMode(item.getAttribute('data-view'));
+    });
 }
 
 // -------------------------------------------------------------------------
@@ -311,6 +411,11 @@ function renderFileRow(file, isSearchActive) {
         '</div>';
 }
 
+function ncEmptyStateHtml() {
+    var noResultsText = ncRex('nextcloudSearchNoResults', 'Keine Treffer gefunden.');
+    return '<div class="nc-empty">' + ncEscHtml(noResultsText) + '</div>';
+}
+
 function renderFiles(files) {
     var fileList = document.getElementById('fileList');
     if (!fileList) {
@@ -318,13 +423,11 @@ function renderFiles(files) {
     }
     var isSearchActive = '' !== currentSearchTerm.trim();
     var visibleFiles = Array.isArray(files) ? files.slice() : [];
+    // Gemerkt fuer setViewMode(): beim Umschalten Liste<->Galerie ohne
+    // Server-Roundtrip mit denselben Daten neu rendern.
+    lastRenderedFiles = visibleFiles;
 
     updateSearchCount(isSearchActive, visibleFiles.length);
-
-    var html = '';
-    if ('/' !== currentPath && !isSearchActive) {
-        html += parentRowHtml();
-    }
 
     visibleFiles.sort(function (a, b) {
         if ('folder' === a.type && 'folder' !== b.type) return -1;
@@ -332,16 +435,131 @@ function renderFiles(files) {
         return decodeURIComponent(a.name || '').localeCompare(decodeURIComponent(b.name || ''));
     });
 
-    if (0 === visibleFiles.length) {
-        var noResultsText = ncRex('nextcloudSearchNoResults', 'Keine Treffer gefunden.');
-        html += '<div class="nc-empty">' + ncEscHtml(noResultsText) + '</div>';
+    if ('masonry' === currentViewMode) {
+        renderMasonryView(visibleFiles);
+    } else {
+        renderListView(visibleFiles, isSearchActive);
     }
+}
 
+function renderListView(visibleFiles, isSearchActive) {
+    var fileList = document.getElementById('fileList');
+    // className explizit setzen (nicht nur Inhalt): sonst bleibt z.B.
+    // "nc-list nc-view-masonry" vom letzten Render stehen (gleicher Grund
+    // wie MediaPlace's renderFiles()-Kommentar zu grid.className).
+    fileList.className = 'nc-list';
+
+    var html = '';
+    if ('/' !== currentPath && !isSearchActive) {
+        html += parentRowHtml();
+    }
+    if (0 === visibleFiles.length) {
+        html += ncEmptyStateHtml();
+    }
     visibleFiles.forEach(function (file) {
         html += renderFileRow(file, isSearchActive);
     });
 
     fileList.innerHTML = html;
+}
+
+function renderMasonryView(visibleFiles) {
+    var fileList = document.getElementById('fileList');
+    fileList.className = 'nc-list nc-view-masonry';
+
+    var html = '';
+    if (0 === visibleFiles.length) {
+        html += ncEmptyStateHtml();
+    }
+    // Kein ".."-Kachel-Aequivalent in der Galerie-Ansicht -- Navigation nach
+    // oben laeuft hier ueber den Breadcrumb (gleiche Entscheidung wie
+    // MediaPlace: dessen Media-Wall/Grid hat ebenfalls keine "hoch"-Kachel,
+    // Navigation laeuft dort ausschliesslich ueber die Sidebar).
+    visibleFiles.forEach(function (file) {
+        html += renderMasonryTile(file);
+    });
+
+    fileList.innerHTML = html;
+}
+
+/**
+ * Galerie-/Masonry-Kachel -- MediaPlace-.mp3-masonry-card-inspiriert
+ * (eigene nc-Klassen). Bild-Kacheln nutzen die bestehende 'preview'-Action
+ * als <img src>, Video-Kacheln die bestehende 'video_preview'-Action als
+ * <video>-Thumbnail (zeigt den ersten Frame nach Laden der Metadaten) --
+ * beide Endpunkte liefern bereits Rohbytes, kein neuer Server-Code noetig.
+ * PDFs/Dokumente/Audio/Archive bekommen ein grosses Icon-Platzhalterfeld
+ * (kein PDF-Rendering-Endpunkt vorhanden). Ordner ebenfalls nur ein Icon.
+ */
+function renderMasonryTile(file) {
+    var isFolder = 'folder' === file.type;
+    var decodedName = decodeURIComponent(file.name || '');
+    var pathAttr = ncEscAttr(file.path || '');
+    var nameAttr = ncEscAttr(decodedName);
+    var isSelected = !isFolder && selectedFiles.has(file.path);
+    var kind = ncFileKind(file);
+
+    var cardClasses = ['nc-masonry-card'];
+    if (isSelected) {
+        cardClasses.push('nc-masonry-card-selected');
+    }
+
+    var mediaHtml;
+    if ('image' === kind) {
+        var previewUrl = 'index.php?' + $.param(apiParams('preview', { path: file.path }));
+        mediaHtml = '<img src="' + previewUrl + '" alt="' + nameAttr + '" loading="lazy">';
+    } else if ('video' === kind) {
+        var videoUrl = 'index.php?' + $.param(apiParams('video_preview', { path: file.path }));
+        mediaHtml = '<video src="' + videoUrl + '" muted preload="metadata"></video>';
+    } else {
+        mediaHtml = '<div class="nc-masonry-icon"><i class="rex-icon ' + ncFileIcon(file) + '"></i></div>';
+    }
+
+    var toolbar = '<div class="nc-masonry-toolbar">';
+    if (!isFolder) {
+        toolbar += '<span class="nc-masonry-check" title="Auswählen" data-action="toggle-select" data-path="' + pathAttr + '"><i class="rex-icon ' + (isSelected ? 'fa-check-square-o' : 'fa-square-o') + '"></i></span>';
+        if (ncRex('nextcloudDownloadEnabled', false)) {
+            toolbar += '<button type="button" class="nc-icon-btn" title="Herunterladen" data-action="download" data-path="' + pathAttr + '" data-type="file"><i class="rex-icon fa-download"></i></button>';
+        }
+        toolbar += '<button type="button" class="nc-icon-btn" title="Importieren" data-action="import" data-path="' + pathAttr + '"><i class="rex-icon fa-upload"></i></button>';
+        if (ncRex('nextcloudSharingEnabled', false)) {
+            toolbar += '<button type="button" class="nc-icon-btn" title="Share-Link erstellen" data-action="share" data-path="' + pathAttr + '" data-name="' + nameAttr + '"><i class="rex-icon fa-share-alt"></i></button>';
+        }
+        if (ncRex('nextcloudDeleteEnabled', false)) {
+            toolbar += '<button type="button" class="nc-icon-btn nc-icon-btn-danger" title="Löschen" data-action="delete" data-path="' + pathAttr + '" data-name="' + nameAttr + '"><i class="rex-icon fa-trash"></i></button>';
+        }
+    } else if (ncRex('nextcloudDownloadEnabled', false)) {
+        toolbar += '<button type="button" class="nc-icon-btn" title="Als ZIP herunterladen" data-action="download" data-path="' + pathAttr + '" data-type="folder"><i class="rex-icon fa-download"></i></button>';
+    }
+    toolbar += '</div>';
+
+    var tileAction = '';
+    if (isFolder) {
+        tileAction = ' data-action="open-folder"';
+    } else if ('image' === kind || 'pdf' === kind || 'video' === kind) {
+        tileAction = ' data-action="preview"';
+    }
+
+    var sizeMetaParts = [];
+    if (!isFolder) {
+        var sizeText = ncFormatBytes(file.filesize);
+        if (sizeText) {
+            sizeMetaParts.push(sizeText);
+        }
+    }
+    var dateText = ncFormatDate(file.modified);
+    if (dateText) {
+        sizeMetaParts.push(dateText);
+    }
+
+    return '<div class="' + cardClasses.join(' ') + '" data-path="' + pathAttr + '"' + tileAction + '>' +
+        toolbar +
+        '<div class="nc-masonry-media">' + mediaHtml + '</div>' +
+        '<div class="nc-masonry-footer">' +
+        '<span class="nc-masonry-name" title="' + nameAttr + '">' + ncEscHtml(decodedName) + '</span>' +
+        '<span class="nc-masonry-meta">' + ncEscHtml(sizeMetaParts.join(' · ')) + '</span>' +
+        '</div>' +
+        '</div>';
 }
 
 // -------------------------------------------------------------------------
@@ -1010,7 +1228,69 @@ function updateBreadcrumb(path) {
 // Event-Delegation: Dateiliste, Breadcrumb
 // -------------------------------------------------------------------------
 function findFileByPath(path) {
-    return currentFiles.filter(function (f) { return f.path === path; })[0] || null;
+    // lastRenderedFiles statt currentFiles: haelt auch waehrend einer
+    // aktiven Suche die tatsaechlich gerade angezeigten Eintraege (siehe
+    // renderFiles()) -- currentFiles ist nur der zuletzt geladene
+    // Ordnerinhalt und waere waehrend einer Suche veraltet.
+    return lastRenderedFiles.filter(function (f) { return f.path === path; })[0] || null;
+}
+
+/**
+ * Gemeinsame Auswahl-Umschaltung fuer beide Ansichten -- Zeilen-Checkbox
+ * (Listenansicht) und Auswahl-Icon (Galerie-Kachel-Toolbar) muessen bei
+ * einem Klick jeweils synchron bleiben, egal welche Ansicht gerade sichtbar
+ * ist (z.B. Auswahl in der Liste treffen, dann per Umschalter in die
+ * Galerie wechseln -- Kachel muss die Auswahl korrekt zeigen).
+ */
+function toggleFileSelection(path) {
+    if (!path) {
+        return;
+    }
+    if (selectedFiles.has(path)) {
+        selectedFiles.delete(path);
+    } else {
+        selectedFiles.add(path);
+    }
+    syncSelectionUi(path);
+    updateToolbar();
+}
+
+/**
+ * Aktualisiert die Auswahl-Darstellung fuer einen Pfad in beiden
+ * Render-Varianten, ohne kompletten Re-Render -- iteriert ueber die feste
+ * Klasse und vergleicht das data-path-Attribut manuell (kein dynamisch
+ * gebauter CSS-Selector-String mit dem Pfad: der kann beliebige Zeichen
+ * wie Anfuehrungszeichen enthalten und wuerde einen Attribut-Selector
+ * potenziell zerbrechen).
+ */
+function syncSelectionUi(path) {
+    var fileList = document.getElementById('fileList');
+    if (!fileList) {
+        return;
+    }
+    var isSelected = selectedFiles.has(path);
+
+    Array.prototype.forEach.call(fileList.querySelectorAll('.nc-row-checkbox'), function (checkbox) {
+        if (checkbox.getAttribute('data-path') !== path) {
+            return;
+        }
+        checkbox.checked = isSelected;
+        var row = checkbox.closest('.nc-row');
+        if (row) {
+            row.classList.toggle('nc-row-selected', isSelected);
+        }
+    });
+
+    Array.prototype.forEach.call(fileList.querySelectorAll('.nc-masonry-card'), function (card) {
+        if (card.getAttribute('data-path') !== path) {
+            return;
+        }
+        card.classList.toggle('nc-masonry-card-selected', isSelected);
+        var icon = card.querySelector('.nc-masonry-check i');
+        if (icon) {
+            icon.className = 'rex-icon ' + (isSelected ? 'fa-check-square-o' : 'fa-square-o');
+        }
+    });
 }
 
 function onFileListClick(e) {
@@ -1032,6 +1312,10 @@ function onFileListClick(e) {
         case 'preview':
             e.preventDefault();
             openPreviewModal(findFileByPath(path));
+            break;
+        case 'toggle-select':
+            e.preventDefault();
+            toggleFileSelection(path);
             break;
         case 'import':
             importFile(path);
@@ -1055,17 +1339,12 @@ function onFileListChange(e) {
     if (!checkbox) {
         return;
     }
-    var path = checkbox.getAttribute('data-path');
-    if (checkbox.checked) {
-        selectedFiles.add(path);
-    } else {
-        selectedFiles.delete(path);
-    }
-    var row = checkbox.closest('.nc-row');
-    if (row) {
-        row.classList.toggle('nc-row-selected', checkbox.checked);
-    }
-    updateToolbar();
+    // Checkbox hat den "checked"-Zustand bereits selbst umgeschaltet (native
+    // Browser-Semantik) -- toggleFileSelection() spiegelt selectedFiles auf
+    // denselben Zustand, syncSelectionUi() macht das hier redundant, aber
+    // idempotent (gleicher Wert), haelt beide Code-Pfade aber auf einer
+    // gemeinsamen Funktion statt doppelter Toggle-Logik.
+    toggleFileSelection(checkbox.getAttribute('data-path'));
 }
 
 function onBreadcrumbClick(e) {
@@ -1088,6 +1367,9 @@ $(document).on('rex:ready', function () {
         // den Hinweis-Block, die dynamischen Elemente unten existieren nicht.
         return;
     }
+
+    initViewMode();
+    initViewToggleUi();
 
     var btnRefresh = document.getElementById('btnRefresh');
     if (btnRefresh) {

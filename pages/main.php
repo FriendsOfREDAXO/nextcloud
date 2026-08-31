@@ -109,6 +109,13 @@ $content = '
                     <button class="nc-btn" type="button" id="nextcloud-search-clear">' . \rex_i18n::msg('nextcloud_search_clear') . '</button>
                     <span id="nextcloud-search-count" class="nc-search-count"></span>
                 </div>
+                <div class="nc-view-toggle-wrap" id="nc-view-toggle">
+                    <button type="button" class="nc-view-toggle-btn" title="' . \rex_i18n::msg('nextcloud_view_mode') . '"><i class="rex-icon fa-list"></i></button>
+                    <div class="nc-view-toggle-menu">
+                        <button type="button" class="nc-view-btn nc-view-active" data-view="list"><i class="rex-icon fa-list"></i> ' . \rex_i18n::msg('nextcloud_view_list') . '</button>
+                        <button type="button" class="nc-view-btn" data-view="masonry"><i class="rex-icon fa-th-large"></i> ' . \rex_i18n::msg('nextcloud_view_masonry') . '</button>
+                    </div>
+                </div>
             </div>
         </div>
 

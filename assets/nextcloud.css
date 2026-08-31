@@ -14,6 +14,11 @@
     /* Palette wie im REDAXO-Backend-Theme (be_style _variables.scss):
        a-lighter #f3f6fb, a-light #dfe3e9, a #9ca5b2, a-dark #324050,
        a-darker #283542, b (brand-primary) #4b9ad9, danger #d9534f */
+    /* Galerie-/Masonry-Spaltenbreite (kein Slider, anders als MediaPlace's
+       --mp3-tile-size -- fester Wert, nur einmal in :root, nicht pro
+       Theme-Block, da rein layoutbezogen statt farblich). */
+    --nc-masonry-tile: 220px;
+
     --nc-bg: #fff;
     --nc-border: #dfe3e9;
     --nc-text: #324050;
@@ -482,6 +487,86 @@ body.rex-theme-dark {
     border-radius: 3px;
 }
 
+/* ---- Ansicht-Umschalter (Liste/Galerie) ----
+   Gleiches Grundmuster wie MediaPlace's .mp3-view-toggle-wrap/-btn/-menu:
+   ein einzelner Trigger-Button (zeigt das Icon der aktiven Ansicht), oeffnet
+   ein kleines, per JS positioniertes Dropdown-Menue (position:fixed). */
+#nc-app .nc-view-toggle-wrap {
+    position: relative;
+    flex-shrink: 0;
+    margin-left: auto;
+}
+
+#nc-app .nc-view-toggle-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    box-sizing: border-box;
+    border: 1px solid var(--nc-border);
+    border-radius: 3px;
+    background: var(--nc-bg);
+    color: var(--nc-text);
+    cursor: pointer;
+    font-size: 13px;
+    transition: background 0.12s, border-color 0.12s;
+}
+
+#nc-app .nc-view-toggle-btn:hover {
+    background: var(--nc-row-hover-bg);
+}
+
+#nc-app .nc-view-toggle-wrap.nc-view-toggle-open .nc-view-toggle-btn {
+    background: var(--nc-account-active-bg);
+    border-color: var(--nc-account-active-border);
+}
+
+.nc-view-toggle-menu {
+    display: none;
+    position: fixed;
+    min-width: 150px;
+    background: var(--nc-bg);
+    border: 1px solid var(--nc-border);
+    border-radius: 3px;
+    box-shadow: var(--nc-modal-shadow);
+    z-index: 1060;
+    overflow: hidden;
+}
+
+#nc-app .nc-view-toggle-wrap.nc-view-toggle-open .nc-view-toggle-menu {
+    display: block;
+}
+
+.nc-view-toggle-menu .nc-view-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: transparent;
+    color: var(--nc-text);
+    font-size: 12px;
+    text-align: left;
+    cursor: pointer;
+}
+
+.nc-view-toggle-menu .nc-view-btn i {
+    width: 14px;
+    text-align: center;
+    color: var(--nc-text-muted);
+}
+
+.nc-view-toggle-menu .nc-view-btn:hover {
+    background: var(--nc-row-hover-bg);
+}
+
+.nc-view-toggle-menu .nc-view-btn.nc-view-active {
+    background: var(--nc-account-active-bg);
+    box-shadow: inset 2px 0 0 var(--nc-account-active-border);
+}
+
 #nc-app .nc-search-input:focus {
     outline: none;
     border-color: var(--nc-input-focus-border);
@@ -621,6 +706,160 @@ body.rex-theme-dark {
 .nc-icon-btn-danger:hover {
     background: var(--nc-action-danger-hover-bg);
     color: var(--nc-action-danger-hover-text);
+}
+
+/* =====================================================================
+   Galerie-/Masonry-Ansicht -- CSS-Multi-Column nach MediaPlace-Vorbild
+   (.mp3-grid.mp3-view-mediawall/.mp3-masonry-card in mediaplace.css), eigene
+   nc-Klassen/Tokens, kein Shared-Code. Anders als MediaPlace kennt
+   cloudconnects NextcloudClient keine Bild-width/height (kein
+   cardAspectRatio()-Aequivalent moeglich) -- Kacheln bekommen deshalb eine
+   feste quadratische Vorschau (aspect-ratio 1/1, object-fit:cover) statt
+   variabler Seitenverhaeltnisse; bleibt trotzdem eine echte CSS-Spalten-
+   Masonry-Anordnung (Kachelhoehen variieren durch den Footer-Text). */
+#nc-app .nc-list.nc-view-masonry {
+    display: block;
+    columns: var(--nc-masonry-tile, 220px) auto;
+    column-gap: 15px;
+    padding: 15px 16px;
+}
+
+#nc-app .nc-masonry-card {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    break-inside: avoid;
+    margin-bottom: 15px;
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background: var(--nc-bg);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    cursor: pointer;
+    position: relative;
+    transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+#nc-app .nc-masonry-card:hover {
+    border-color: var(--nc-accent);
+}
+
+#nc-app .nc-masonry-card.nc-masonry-card-selected {
+    border-color: var(--nc-row-selected-border);
+    box-shadow: 0 0 0 2px var(--nc-accent-soft);
+}
+
+#nc-app .nc-masonry-media {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1 / 1;
+    background: var(--nc-accounts-bg);
+    line-height: 0;
+}
+
+#nc-app .nc-masonry-media img,
+#nc-app .nc-masonry-media video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+#nc-app .nc-masonry-icon {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 40px;
+    color: var(--nc-row-icon);
+}
+
+#nc-app .nc-masonry-icon .fa-folder,
+#nc-app .nc-masonry-icon .fa-folder-o {
+    color: var(--nc-row-icon-folder);
+}
+
+/* Hover-Reveal-Aktionsleiste -- deckt dieselben Aktionen ab wie die
+   Zeilen-Icons in der Listenansicht (Import/Download/Share/Löschen), nur
+   platzsparend nur bei Hover/Auswahl sichtbar statt permanent auf der
+   Kachel (analog .mp3-masonry-toolbar). Feste dunkle Overlay-Farbe statt
+   --nc-*-Tokens: liegt ueber beliebigen, unbekannten Thumbnail-Hintergruenden,
+   braucht daher immer denselben hohen Kontrast unabhaengig vom Backend-Theme
+   -- exakt dasselbe Muster wie MediaPlace's .mp3-masonry-check/-toolbar. */
+#nc-app .nc-masonry-toolbar {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    display: flex;
+    gap: 4px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 2;
+}
+
+#nc-app .nc-masonry-card:hover .nc-masonry-toolbar,
+#nc-app .nc-masonry-card.nc-masonry-card-selected .nc-masonry-toolbar {
+    opacity: 1;
+}
+
+#nc-app .nc-masonry-toolbar .nc-icon-btn {
+    width: 26px;
+    height: 26px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+}
+
+#nc-app .nc-masonry-toolbar .nc-icon-btn:hover {
+    background: rgba(0, 0, 0, 0.72);
+    color: #fff;
+}
+
+#nc-app .nc-masonry-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 3px;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+#nc-app .nc-masonry-footer {
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+#nc-app .nc-masonry-name {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--nc-row-name);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#nc-app .nc-masonry-meta {
+    font-size: 11px;
+    color: var(--nc-row-meta);
+}
+
+@media (max-width: 900px) {
+    #nc-app .nc-list.nc-view-masonry {
+        columns: min(var(--nc-masonry-tile, 220px), 170px) auto;
+    }
+}
+
+@media (max-width: 600px) {
+    #nc-app .nc-list.nc-view-masonry {
+        columns: min(var(--nc-masonry-tile, 220px), 150px) auto;
+        padding: 10px;
+    }
 }
 
 #nc-app .nc-empty,

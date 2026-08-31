@@ -36,6 +36,11 @@ nextcloud_search_placeholder = Datei- oder Ordnername suchen...
 nextcloud_search_clear = Zurücksetzen
 nextcloud_search_no_results = Keine Treffer gefunden.
 nextcloud_search_results_suffix = Treffer
+
+# Ansicht (Liste/Galerie)
+nextcloud_view_mode = Ansicht wechseln
+nextcloud_view_list = Liste
+nextcloud_view_masonry = Galerie
 nextcloud_perm_access = Zugriff auf Nextcloud
 nextcloud_perm_upload_mediapool = Medienpool-Dateien nach Nextcloud hochladen
 nextcloud_perm_delete = Dateien in Nextcloud löschen
