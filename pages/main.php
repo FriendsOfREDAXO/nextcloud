@@ -67,7 +67,7 @@ if ($canUploadFromMediapool) {
                     <p class="nc-hint" style="margin-top:10px;">' . \rex_i18n::msg('nextcloud_upload_multiple_from_mediapool_notice') . '</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="nc-btn" data-dismiss="modal">' . \rex_i18n::msg('close') . '</button>
+                    <button type="button" class="nc-btn" data-dismiss="modal">' . $this->i18n('close') . '</button>
                     <button type="button" class="nc-btn nc-btn-primary" id="btnUploadMedialistToNextcloud">
                         <i class="rex-icon fa-cloud-upload"></i> ' . \rex_i18n::msg('nextcloud_upload_multiple_to_current_folder') . '
                     </button>

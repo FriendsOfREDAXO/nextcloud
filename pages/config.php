@@ -107,7 +107,7 @@ if ('1' === $this->getConfig('enable_sharing', '1')) {
 // Submit
 $formElements = [];
 $n = [];
-$n['field'] = '<button class="btn btn-save rex-form-aligned" type="submit" name="config-submit" value="1">' . \rex_i18n::msg('save') . '</button>';
+$n['field'] = '<button class="btn btn-save rex-form-aligned" type="submit" name="config-submit" value="1">' . $this->i18n('save') . '</button>';
 $formElements[] = $n;
 
 $fragment = new \rex_fragment();

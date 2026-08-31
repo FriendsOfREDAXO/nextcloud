@@ -5,6 +5,8 @@ nextcloud_files = Dateien
 nextcloud_settings = Einstellungen
 nextcloud_config = Einstellungen
 nextcloud_config_saved = Einstellungen wurden gespeichert
+nextcloud_save = Speichern
+nextcloud_close = Schließen
 
 # Accounts (seit 2.0.0 schreibgeschuetzt hier, verwaltet in cloudconnect)
 nextcloud_accounts_title = Nextcloud-Accounts

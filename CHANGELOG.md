@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.2] – 2026-08-31
+
+### Behoben
+
+- "Speichern"-Button auf der Einstellungsseite und "Schließen"-Button im Medienpool-Upload-Modal zeigten `[translate:save]`/`[translate:close]` statt echtem Text – Ursache: `\rex_i18n::msg('save')`/`\rex_i18n::msg('close')` erwarteten einen globalen REDAXO-Kern-Sprachschlüssel, den es so gar nicht gibt (Kern definiert nur `save_and_goon_tooltip`/`save_and_close_tooltip`, kein bloßes `save`; kein `close` überhaupt). Jetzt über `$this->i18n('save')`/`$this->i18n('close')` (addon-eigene, präfigierte Schlüssel `nextcloud_save`/`nextcloud_close`) gelöst – gleiches Muster wie andere Addons in diesem Projekt (z. B. `erecht24`).
+
 ## [2.0.1] – 2026-08-31
 
 ### Geändert
