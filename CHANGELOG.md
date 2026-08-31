@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.1.0] – 2026-08-31
+
+### Neu
+- **Akzentfarbe je Account**: eine in cloudconnect gesetzte Verbindungsfarbe (siehe dortiges Changelog) färbt jetzt den Rahmen und das Icon des jeweiligen Buttons im Konto-Umschalter ein, sowie die Trennlinie darunter für den gerade aktiven Account.
+
+### Verbessert
+- Werkzeugleiste neu geordnet und in eine einzige Zeile zusammengefasst: Zielkategorie und Suche als "schwebendes Label" (Bezeichnung wandert in eine kleine Caption über den Feldrand statt als eigene Zeile), Suche zentriert, breiter und mit [x]/Trefferzahl direkt im Feld statt danebenstehend. Import-/Aktualisieren-Aktionen und Ansicht-Umschalter rechts daneben, Breadcrumb auf eigener Zeile darunter. Alle Bedienelemente in der Zeile jetzt einheitlich 34px hoch.
+- Redundanter "NextCloud"-Titel direkt unter dem Konto-Umschalter entfernt (stand dort ohne echten Zweck neben dem sowieso schon vorhandenen Home-Link in der Breadcrumb).
+- Kategorie-Auswahl hat jetzt eine sichtbare Beschriftung ("Zielkategorie") statt eines unbeschrifteten `<select>`.
+- Seitentitel "Nextcloud-Dateien" statt des veralteten "Nextcloud Media-Import" (Funktionsumfang ist längst mehr als reiner Import).
+
 ## [2.0.2] – 2026-08-31
 
 ### Behoben

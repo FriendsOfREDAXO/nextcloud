@@ -142,9 +142,23 @@ function renderAccountSwitcher(connections) {
     wrap.style.display = '';
     wrap.innerHTML = connections.map(function (c) {
         var active = c.id === currentConnectionId ? ' nc-account-active' : '';
-        return '<div class="nc-account-item' + active + '" data-connection="' + ncEscAttr(c.id) + '">' +
-            '<i class="rex-icon fa-cloud"></i>' + ncEscHtml(c.label) + '</div>';
+        // Akzentfarbe optional aus cloudconnect (ConnectionStore::create()/setColor()) --
+        // faerbt Button-Rahmen UND Icon ein statt eines separaten Punkts
+        // (gleiches Prinzip wie MediaPlace's Icon-Einfaerbung), unabhaengig
+        // vom aktiv-Zustand (der laeuft weiterhin zusaetzlich ueber den
+        // Hintergrund/nc-account-active).
+        var style = c.color ? ' style="border-color:' + ncEscAttr(c.color) + '"' : '';
+        var iconStyle = c.color ? ' style="color:' + ncEscAttr(c.color) + '"' : '';
+        return '<div class="nc-account-item' + active + '" data-connection="' + ncEscAttr(c.id) + '"' + style + '>' +
+            '<i class="rex-icon fa-cloud"' + iconStyle + '></i>' + ncEscHtml(c.label) + '</div>';
     }).join('');
+
+    // Trennlinie unter dem Konto-Umschalter uebernimmt die Akzentfarbe des
+    // GERADE AKTIVEN Accounts (falls gesetzt) -- zusaetzlicher, dezenter
+    // Hinweis "das ist der Kontext, in dem du gerade browst", auch wenn der
+    // Umschalter selbst durch Scrollen aus dem Blick geraet.
+    var activeConn = connections.filter(function (c) { return c.id === currentConnectionId; })[0];
+    wrap.style.borderBottomColor = (activeConn && activeConn.color) ? activeConn.color : '';
 
     Array.prototype.forEach.call(wrap.querySelectorAll('.nc-account-item'), function (el) {
         el.addEventListener('click', function () {

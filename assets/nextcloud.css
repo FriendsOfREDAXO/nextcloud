@@ -27,8 +27,6 @@
     --nc-accent-hover: #2f7ab8;
     --nc-accent-soft: #dbedf7;
 
-    --nc-header-bg: #f3f6fb;
-    --nc-header-border: #dfe3e9;
 
     --nc-accounts-bg: #f3f6fb;
     --nc-accounts-border: #dfe3e9;
@@ -48,7 +46,6 @@
     --nc-input-text: #324050;
     --nc-input-focus-border: #324050;
     --nc-input-focus-shadow: rgba(50, 64, 80, 0.15);
-    --nc-search-icon: #68727d;
 
     --nc-row-hover-bg: #f3f6fb;
     --nc-row-border: #dfe3e9;
@@ -104,8 +101,6 @@ body.rex-theme-dark {
     --nc-accent-hover: #8ab8e8;
     --nc-accent-soft: rgba(108, 155, 210, 0.16);
 
-    --nc-header-bg: #212836;
-    --nc-header-border: #3a4557;
 
     --nc-accounts-bg: #212836;
     --nc-accounts-border: #3a4557;
@@ -125,7 +120,6 @@ body.rex-theme-dark {
     --nc-input-text: #eee;
     --nc-input-focus-border: #6c9bd2;
     --nc-input-focus-shadow: rgba(108, 155, 210, 0.2);
-    --nc-search-icon: #9aa5b1;
 
     --nc-row-hover-bg: #212836;
     --nc-row-border: #3a4557;
@@ -182,8 +176,6 @@ body.rex-theme-dark {
         --nc-accent-hover: #8ab8e8;
         --nc-accent-soft: rgba(108, 155, 210, 0.16);
 
-        --nc-header-bg: #212836;
-        --nc-header-border: #3a4557;
 
         --nc-accounts-bg: #212836;
         --nc-accounts-border: #3a4557;
@@ -203,7 +195,6 @@ body.rex-theme-dark {
         --nc-input-text: #eee;
         --nc-input-focus-border: #6c9bd2;
         --nc-input-focus-shadow: rgba(108, 155, 210, 0.2);
-        --nc-search-icon: #9aa5b1;
 
         --nc-row-hover-bg: #212836;
         --nc-row-border: #3a4557;
@@ -308,34 +299,6 @@ body.rex-theme-dark {
     opacity: 0.8;
 }
 
-/* ---- Kopfzeile ---- */
-#nc-app .nc-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 12px 16px;
-    background: var(--nc-header-bg);
-    border-bottom: 1px solid var(--nc-header-border);
-    flex-wrap: wrap;
-}
-
-#nc-app .nc-header-title {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--nc-text);
-}
-
-#nc-app .nc-header-actions {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
 /* .nc-btn/.nc-icon-btn sind bewusst NICHT unter #nc-app gescoped -- die drei
    Modals (Vorschau/Upload/Share) werden per JS an document.body angehaengt
    (siehe nextcloud.js), liegen also ausserhalb von #nc-app, nutzen aber
@@ -344,7 +307,9 @@ body.rex-theme-dark {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    padding: 6px 12px;
+    height: 34px;
+    box-sizing: border-box;
+    padding: 0 12px;
     font-size: 12px;
     font-weight: 500;
     border-radius: 3px;
@@ -416,9 +381,143 @@ body.rex-theme-dark {
     flex-wrap: wrap;
 }
 
-#nc-app .nc-category-select {
-    min-width: 220px;
-    max-width: 340px;
+/* Kategorie-Auswahl (Ziel fuer Import) und Suche als "schwebendes Label"
+   (Material-Design-Muster): das <label> liegt anfangs ueber dem Feld und
+   wandert bei Fokus/Inhalt in eine kleine Caption ueber dem Feldrand. Bei
+   der Kategorie-Auswahl (immer ein echter Wert gewaehlt, kein leerer
+   Zustand) bleibt die Caption bewusst dauerhaft "geflogen" -- keine
+   Animation noetig/sinnvoll, siehe .nc-field-category label unten. */
+#nc-app .nc-field {
+    position: relative;
+}
+
+#nc-app .nc-field-category {
+    min-width: 200px;
+    max-width: 260px;
+}
+
+#nc-app .nc-field-category label {
+    position: absolute;
+    left: 9px;
+    top: -7px;
+    padding: 0 4px;
+    background: var(--nc-bg);
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--nc-accent);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    pointer-events: none;
+    z-index: 1;
+}
+
+#nc-app .nc-field-search {
+    display: flex;
+    align-items: center;
+    flex: 1 1 auto;
+    min-width: 160px;
+    max-width: 640px;
+}
+
+#nc-app .nc-field-search label {
+    position: absolute;
+    left: 11px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    color: var(--nc-text-muted);
+    pointer-events: none;
+    transition: top 0.15s, font-size 0.15s, color 0.15s, transform 0.15s;
+}
+
+/* placeholder=" " (echtes Leerzeichen statt leerem String) ist Absicht --
+   nur so greift :placeholder-shown zuverlaessig als "Feld ist leer"-Signal
+   ueber Browser hinweg. */
+#nc-app .nc-field-search .nc-search-input:focus ~ label,
+#nc-app .nc-field-search .nc-search-input:not(:placeholder-shown) ~ label {
+    top: -7px;
+    left: 9px;
+    transform: none;
+    padding: 0 4px;
+    background: var(--nc-bg);
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--nc-accent);
+}
+
+#nc-app .nc-search-input {
+    width: 100%;
+    height: 34px;
+    box-sizing: border-box;
+    padding: 0 60px 0 12px;
+    font-size: 12px;
+    color: var(--nc-input-text);
+    background: var(--nc-input-bg);
+    border: 1px solid var(--nc-input-border);
+    border-radius: 3px;
+}
+
+#nc-app .nc-search-input:focus {
+    outline: none;
+    border-color: var(--nc-input-focus-border);
+    box-shadow: 0 0 0 3px var(--nc-input-focus-shadow);
+}
+
+/* [x]-Button + Trefferzahl liegen INNERHALB des Suchfelds (rechtsbuendig),
+   nicht mehr als separate Elemente daneben -- .nc-search-input's
+   padding-right oben schafft dafuer Platz. */
+#nc-app .nc-field-clear {
+    position: absolute;
+    right: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: transparent;
+    color: var(--nc-text-muted);
+    cursor: pointer;
+    font-size: 11px;
+}
+
+#nc-app .nc-field-clear:hover {
+    background: var(--nc-row-hover-bg);
+    color: var(--nc-text);
+}
+
+#nc-app .nc-search-count {
+    position: absolute;
+    right: 34px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 10px;
+    color: var(--nc-text-muted);
+    white-space: nowrap;
+}
+
+#nc-app .nc-btn-icon {
+    width: 34px;
+    padding: 0;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+/* Nimmt neben Upload-Trigger/Aktualisieren auch die per JS bei
+   Mehrfachauswahl eingefuegten Import/Loeschen/ZIP-Buttons auf (siehe
+   updateToolbar() in nextcloud.js, container.insertBefore()). */
+#nc-app .nc-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 #nc-app .nc-breadcrumb {
@@ -426,7 +525,13 @@ body.rex-theme-dark {
     align-items: center;
     flex-wrap: wrap;
     gap: 4px;
-    padding: 8px 12px;
+    /* min-height statt height: ein tiefer verschachtelter Pfad darf auf
+       mehrere Zeilen umbrechen (flex-wrap oben), ohne abgeschnitten zu
+       werden -- im Normalfall (eine Zeile) trotzdem exakt so hoch wie die
+       Felder/Buttons in der Zeile darueber. */
+    min-height: 34px;
+    box-sizing: border-box;
+    padding: 0 12px;
     background: var(--nc-breadcrumb-bg);
     border: 1px solid var(--nc-breadcrumb-border);
     border-radius: 3px;
@@ -452,57 +557,25 @@ body.rex-theme-dark {
     font-weight: 600;
 }
 
-#nc-app .nc-search {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
-#nc-app .nc-search-input-wrap {
-    position: relative;
-    flex: 1;
-    max-width: 420px;
-}
-
-#nc-app .nc-search-input-wrap:focus-within i {
-    color: var(--nc-accent);
-}
-
-#nc-app .nc-search-input-wrap i {
-    position: absolute;
-    left: 10px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--nc-search-icon);
-    font-size: 12px;
-}
-
-#nc-app .nc-search-input {
-    width: 100%;
-    padding: 7px 10px 7px 28px;
-    font-size: 12px;
-    color: var(--nc-input-text);
-    background: var(--nc-input-bg);
-    border: 1px solid var(--nc-input-border);
-    border-radius: 3px;
-}
-
 /* ---- Ansicht-Umschalter (Liste/Galerie) ----
    Gleiches Grundmuster wie MediaPlace's .mp3-view-toggle-wrap/-btn/-menu:
    ein einzelner Trigger-Button (zeigt das Icon der aktiven Ansicht), oeffnet
-   ein kleines, per JS positioniertes Dropdown-Menue (position:fixed). */
+   ein kleines, per JS positioniertes Dropdown-Menue (position:fixed). Sitzt
+   jetzt am Ende der oberen Werkzeugzeile (Kategorie/Suche/Import/Aktualisieren/
+   Ansicht) -- kein margin-left:auto mehr noetig, .nc-field-search's flex:1
+   schiebt es bereits ans Zeilenende.
+   */
 #nc-app .nc-view-toggle-wrap {
     position: relative;
     flex-shrink: 0;
-    margin-left: auto;
 }
 
 #nc-app .nc-view-toggle-btn {
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 32px;
-    height: 32px;
+    width: 34px;
+    height: 34px;
     box-sizing: border-box;
     border: 1px solid var(--nc-border);
     border-radius: 3px;
@@ -565,18 +638,6 @@ body.rex-theme-dark {
 .nc-view-toggle-menu .nc-view-btn.nc-view-active {
     background: var(--nc-account-active-bg);
     box-shadow: inset 2px 0 0 var(--nc-account-active-border);
-}
-
-#nc-app .nc-search-input:focus {
-    outline: none;
-    border-color: var(--nc-input-focus-border);
-    box-shadow: 0 0 0 3px var(--nc-input-focus-shadow);
-    background: var(--nc-accent-soft);
-}
-
-#nc-app .nc-search-count {
-    font-size: 11px;
-    color: var(--nc-text-muted);
 }
 
 /* ---- Datei-/Ordner-Liste ---- */
@@ -1102,7 +1163,8 @@ body.rex-theme-dark {
         align-items: stretch;
     }
 
-    #nc-app .nc-search-input-wrap {
+    #nc-app .nc-field-category,
+    #nc-app .nc-field-search {
         max-width: none;
     }
 }

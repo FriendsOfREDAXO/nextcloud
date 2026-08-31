@@ -82,32 +82,23 @@ $content = '
     <div class="nc-card">
         <div class="nc-accounts" id="nc-accounts"></div>
 
-        <div class="nc-header">
-            <div class="nc-header-title"><i class="rex-icon fa-cloud"></i> ' . \rex_i18n::msg('nextcloud') . '</div>
-            <div class="nc-header-actions" id="nc-toolbar-actions">
-                ' . $uploadModalTrigger . '
-                <button class="nc-btn" id="btnRefresh" type="button" title="' . \rex_i18n::msg('nextcloud_refresh') . '">
-                    <i class="rex-icon fa-refresh"></i> ' . \rex_i18n::msg('nextcloud_refresh') . '
-                </button>
-                <button class="nc-btn" id="btnHome" type="button" title="Home">
-                    <i class="rex-icon fa-home"></i>
-                </button>
-            </div>
-        </div>
-
         <div class="nc-toolbar">
-            <div class="nc-toolbar-row">
-                <div class="nc-category-select">' . $catsSel->get() . '</div>
-                <div class="nc-breadcrumb" id="nc-breadcrumb"></div>
-            </div>
-            <div class="nc-toolbar-row">
-                <div class="nc-search">
-                    <div class="nc-search-input-wrap">
-                        <i class="rex-icon fa-search"></i>
-                        <input type="text" id="nextcloud-search-input" class="nc-search-input" placeholder="' . \rex_i18n::msg('nextcloud_search_placeholder') . '">
-                    </div>
-                    <button class="nc-btn" type="button" id="nextcloud-search-clear">' . \rex_i18n::msg('nextcloud_search_clear') . '</button>
+            <div class="nc-toolbar-row nc-toolbar-row-main">
+                <div class="nc-field nc-field-category" title="' . \rex_i18n::msg('nextcloud_target_category') . '">
+                    <label for="rex-mediapool-category">' . \rex_i18n::msg('nextcloud_target_category') . '</label>
+                    ' . $catsSel->get() . '
+                </div>
+                <div class="nc-field nc-field-search">
+                    <input type="text" id="nextcloud-search-input" class="nc-search-input" placeholder=" ">
+                    <label for="nextcloud-search-input">' . \rex_i18n::msg('nextcloud_search_placeholder_label') . '</label>
+                    <button type="button" class="nc-field-clear" id="nextcloud-search-clear" title="' . \rex_i18n::msg('nextcloud_search_clear') . '"><i class="rex-icon fa-times"></i></button>
                     <span id="nextcloud-search-count" class="nc-search-count"></span>
+                </div>
+                <div class="nc-toolbar-actions" id="nc-toolbar-actions">
+                    ' . $uploadModalTrigger . '
+                    <button class="nc-btn nc-btn-icon" id="btnRefresh" type="button" title="' . \rex_i18n::msg('nextcloud_refresh') . '">
+                        <i class="rex-icon fa-refresh"></i>
+                    </button>
                 </div>
                 <div class="nc-view-toggle-wrap" id="nc-view-toggle">
                     <button type="button" class="nc-view-toggle-btn" title="' . \rex_i18n::msg('nextcloud_view_mode') . '"><i class="rex-icon fa-list"></i></button>
@@ -116,6 +107,9 @@ $content = '
                         <button type="button" class="nc-view-btn" data-view="masonry"><i class="rex-icon fa-th-large"></i> ' . \rex_i18n::msg('nextcloud_view_masonry') . '</button>
                     </div>
                 </div>
+            </div>
+            <div class="nc-toolbar-row nc-toolbar-row-breadcrumb">
+                <div class="nc-breadcrumb" id="nc-breadcrumb"></div>
             </div>
         </div>
 

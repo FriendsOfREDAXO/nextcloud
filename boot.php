@@ -59,7 +59,7 @@ if (\rex::isBackend() && \rex::getUser()) {
             if (!\FriendsOfRedaxo\CloudConnect\ConnectionStore::isComplete($connection)) {
                 continue;
             }
-            $connections[] = ['id' => $id, 'label' => (string) ($connection['label'] ?? $id)];
+            $connections[] = ['id' => $id, 'label' => (string) ($connection['label'] ?? $id), 'color' => (string) ($connection['color'] ?? '')];
         }
 
         \rex_view::setJsProperty('nextcloudConnections', $connections);
